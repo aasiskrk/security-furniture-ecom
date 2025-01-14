@@ -16,8 +16,16 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/cart", require("./routes/cartRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!" });
+});
 
 // Basic route
 app.get("/", (req, res) => {
