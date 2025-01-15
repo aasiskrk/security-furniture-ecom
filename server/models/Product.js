@@ -14,20 +14,39 @@ const productSchema = new mongoose.Schema(
     price: {
       type: Number,
       required: true,
+      min: 0,
     },
     brand: {
       type: String,
       required: true,
     },
-    specs: {
+    category: {
+      type: String,
+      required: true,
+      enum: ["Gaming", "Business", "Student", "Workstation", "Ultrabook"],
+    },
+    specifications: {
       processor: String,
       ram: String,
       storage: String,
       display: String,
+      graphics: String,
+      battery: String,
+      weight: String,
+      ports: [String],
     },
-    stock: {
+    countInStock: {
       type: Number,
       required: true,
+      min: 0,
+      default: 0,
+    },
+    rating: {
+      type: Number,
+      default: 0,
+    },
+    numReviews: {
+      type: Number,
       default: 0,
     },
     image: {
