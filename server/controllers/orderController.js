@@ -1,6 +1,8 @@
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 
+// For development, we'll use a default user ID
+const DEFAULT_USER_ID = "65a3c4d3a7c9e6b8f1234567"; // This is a temporary solution
 // Create new order
 const createOrder = async (req, res) => {
   try {
