@@ -20,6 +20,10 @@ const cartSchema = new mongoose.Schema(
           min: 1,
           default: 1,
         },
+        selectedColor: {
+          name: { type: String, required: true },
+          code: { type: String, required: true }, // Hex color code
+        },
       },
     ],
     totalAmount: {

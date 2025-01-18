@@ -23,6 +23,10 @@ const orderSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+        selectedColor: {
+          name: { type: String, required: true },
+          code: { type: String, required: true }, // Hex color code
+        },
       },
     ],
     shippingAddress: {
@@ -34,7 +38,7 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: true,
-      enum: ["COD", "Card", "UPI"],
+      enum: ["COD", "Esewa", ""],
     },
     paymentStatus: {
       type: String,
