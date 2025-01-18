@@ -1,8 +1,6 @@
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 
-// For development, we'll use a default user ID
-const DEFAULT_USER_ID = "65a3c4d3a7c9e6b8f1234567"; // This is a temporary solution
 // Create new order
 const createOrder = async (req, res) => {
   try {
@@ -22,6 +20,7 @@ const createOrder = async (req, res) => {
       product: item.product._id,
       quantity: item.quantity,
       price: item.product.price,
+      selectedColor: item.selectedColor, // Include selected color in order
     }));
 
     const order = new Order({
@@ -41,7 +40,8 @@ const createOrder = async (req, res) => {
 
     res.status(201).json(createdOrder);
   } catch (error) {
-    res.status(500).json({ message: "Server Error" });
+    console.error("Error creating order:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -50,7 +50,10 @@ const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("user", "name email")
-      .populate("items.product", "name price image");
+      .populate(
+        "items.product",
+        "name price pictures colors material dimensions"
+      );
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -74,7 +77,10 @@ const getOrderById = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
-      .populate("items.product", "name price image")
+      .populate(
+        "items.product",
+        "name price pictures colors material dimensions"
+      )
       .sort("-createdAt");
 
     res.status(200).json(orders);
@@ -88,7 +94,10 @@ const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find({})
       .populate("user", "name email")
-      .populate("items.product", "name price image")
+      .populate(
+        "items.product",
+        "name price pictures colors material dimensions"
+      )
       .sort("-createdAt");
 
     res.status(200).json(orders);

@@ -12,46 +12,46 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// Get dashboard stats
-const getDashboardStats = async (req, res) => {
-  try {
-    const totalUsers = await User.countDocuments({ role: "user" });
-    const totalProducts = await Product.countDocuments();
-    const totalOrders = await Order.countDocuments();
+// // Get dashboard stats
+// const getDashboardStats = async (req, res) => {
+//   try {
+//     const totalUsers = await User.countDocuments({ role: "user" });
+//     const totalProducts = await Product.countDocuments();
+//     const totalOrders = await Order.countDocuments();
 
-    // Get revenue stats
-    const orders = await Order.find({
-      orderStatus: { $in: ["Delivered", "Shipped"] },
-      paymentStatus: "Completed",
-    });
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + order.totalAmount,
-      0
-    );
+//     // Get revenue stats
+//     const orders = await Order.find({
+//       orderStatus: { $in: ["Delivered", "Shipped"] },
+//       paymentStatus: "Completed",
+//     });
+//     const totalRevenue = orders.reduce(
+//       (sum, order) => sum + order.totalAmount,
+//       0
+//     );
 
-    // Get recent orders
-    const recentOrders = await Order.find()
-      .populate("user", "name email")
-      .sort("-createdAt")
-      .limit(5);
+//     // Get recent orders
+//     const recentOrders = await Order.find()
+//       .populate("user", "name email")
+//       .sort("-createdAt")
+//       .limit(5);
 
-    // Get low stock products (less than 10 items)
-    const lowStockProducts = await Product.find({ countInStock: { $lt: 10 } });
+//     // Get low stock products (less than 10 items)
+//     const lowStockProducts = await Product.find({ countInStock: { $lt: 10 } });
 
-    res.status(200).json({
-      stats: {
-        totalUsers,
-        totalProducts,
-        totalOrders,
-        totalRevenue,
-      },
-      recentOrders,
-      lowStockProducts,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server Error" });
-  }
-};
+//     res.status(200).json({
+//       stats: {
+//         totalUsers,
+//         totalProducts,
+//         totalOrders,
+//         totalRevenue,
+//       },
+//       recentOrders,
+//       lowStockProducts,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Server Error" });
+//   }
+// };
 
 // Update user role
 const updateUserRole = async (req, res) => {
@@ -94,7 +94,7 @@ const deleteUser = async (req, res) => {
 
 module.exports = {
   getAllUsers,
-  getDashboardStats,
+  // getDashboardStats,
   updateUserRole,
   deleteUser,
 };
