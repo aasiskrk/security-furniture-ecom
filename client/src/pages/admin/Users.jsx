@@ -2,38 +2,30 @@ import { useState } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 import { FiEdit2, FiTrash2, FiPlus, FiSearch } from 'react-icons/fi';
 
-const Products = () => {
+const Users = () => {
     // Sample data - replace with actual API call
-    const [products] = useState([
+    const [users] = useState([
         {
             _id: '1',
-            name: 'Modern Leather Sofa',
-            description: 'Luxurious leather sofa with modern design',
-            price: 2499999,
-            category: 'Living Room',
-            subcategory: 'Sofas',
-            material: 'Premium Leather',
-            colors: [
-                { name: 'Black', code: '#000000' },
-                { name: 'Brown', code: '#8B4513' }
-            ],
-            dimensions: {
-                width: 220,
-                height: 85,
-                depth: 95
-            },
-            weight: 45,
-            inStock: 5,
-            images: [
-                'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3'
-            ],
-            features: [
-                'Premium leather upholstery',
-                'High-density foam cushions',
-                'Solid wood frame'
-            ],
+            name: 'John Doe',
+            email: 'john.doe@example.com',
+            role: 'Customer',
             status: 'Active',
-            createdAt: '2024-02-20'
+            orders: 12,
+            lastLogin: '2024-02-20',
+            createdAt: '2024-01-15',
+            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1'
+        },
+        {
+            _id: '2',
+            name: 'Jane Smith',
+            email: 'jane.smith@example.com',
+            role: 'Admin',
+            status: 'Active',
+            orders: 5,
+            lastLogin: '2024-02-19',
+            createdAt: '2024-01-10',
+            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1'
         }
     ]);
 
@@ -43,12 +35,12 @@ const Products = () => {
                 {/* Header */}
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-3xl font-serif font-bold text-gray-900">Products</h1>
-                        <p className="text-gray-600 mt-1">Manage your product inventory</p>
+                        <h1 className="text-3xl font-serif font-bold text-gray-900">Users</h1>
+                        <p className="text-gray-600 mt-1">Manage user accounts and permissions</p>
                     </div>
                     <button className="flex items-center space-x-2 bg-[#C4A484] text-white px-6 py-3 rounded-lg hover:bg-[#B39374] transition-all duration-200">
                         <FiPlus className="w-5 h-5" />
-                        <span>Add Product</span>
+                        <span>Add User</span>
                     </button>
                 </div>
 
@@ -59,16 +51,15 @@ const Products = () => {
                             <FiSearch className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search products..."
+                                placeholder="Search users..."
                                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white"
                             />
                         </div>
                         <div className="flex items-center gap-4">
                             <select className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white">
-                                <option value="">All Categories</option>
-                                <option value="living-room">Living Room</option>
-                                <option value="bedroom">Bedroom</option>
-                                <option value="dining-room">Dining Room</option>
+                                <option value="">All Roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="customer">Customer</option>
                             </select>
                             <select className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white">
                                 <option value="">All Status</option>
@@ -79,69 +70,62 @@ const Products = () => {
                     </div>
                 </div>
 
-                {/* Products Table */}
+                {/* Users Table */}
                 <div className="bg-white rounded-xl border border-[#C4A484]/10 overflow-hidden">
                     <table className="w-full">
                         <thead className="bg-[#F8F5F1]">
                             <tr>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Product</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Category</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Price</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Stock</th>
-                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Colors</th>
+                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">User</th>
+                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Role</th>
+                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Orders</th>
+                                <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Last Login</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Status</th>
                                 <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#C4A484]/10">
-                            {products.map((product) => (
-                                <tr key={product._id} className="hover:bg-[#F8F5F1]/50 transition-colors">
+                            {users.map((user) => (
+                                <tr key={user._id} className="hover:bg-[#F8F5F1]/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
-                                            <div className="h-16 w-16 flex-shrink-0">
+                                            <div className="h-10 w-10 flex-shrink-0">
                                                 <img
-                                                    className="h-16 w-16 rounded-lg object-cover border border-[#C4A484]/10"
-                                                    src={product.images[0]}
-                                                    alt={product.name}
+                                                    className="h-10 w-10 rounded-full object-cover border border-[#C4A484]/10"
+                                                    src={user.avatar}
+                                                    alt={user.name}
                                                 />
                                             </div>
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                                <div className="text-sm text-gray-500 line-clamp-1">{product.description}</div>
+                                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                                <div className="text-sm text-gray-500">{user.email}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-900">{product.category}</div>
-                                        <div className="text-sm text-gray-500">{product.subcategory}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
-                                        Rp {product.price.toLocaleString()}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex text-sm ${product.inStock > 0 ? 'text-green-600' : 'text-red-600'
+                                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${user.role === 'Admin'
+                                            ? 'bg-purple-100 text-purple-800'
+                                            : 'bg-blue-100 text-blue-800'
                                             }`}>
-                                            {product.inStock} units
+                                            {user.role}
                                         </span>
                                     </td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                        {user.orders} orders
+                                    </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex -space-x-1">
-                                            {product.colors.map((color, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="w-6 h-6 rounded-full border-2 border-white ring-2 ring-[#C4A484]/10"
-                                                    style={{ backgroundColor: color.code }}
-                                                    title={color.name}
-                                                />
-                                            ))}
+                                        <div className="text-sm text-gray-900">
+                                            {new Date(user.lastLogin).toLocaleDateString()}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {new Date(user.lastLogin).toLocaleTimeString()}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${product.status === 'Active'
+                                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${user.status === 'Active'
                                             ? 'bg-green-100 text-green-800'
                                             : 'bg-gray-100 text-gray-800'
                                             }`}>
-                                            {product.status}
+                                            {user.status}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
@@ -163,7 +147,7 @@ const Products = () => {
                     <div className="bg-[#F8F5F1]/50 px-6 py-4 border-t border-[#C4A484]/10">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-600">
-                                Showing 1 to {products.length} of {products.length} products
+                                Showing 1 to {users.length} of {users.length} users
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button className="px-4 py-2 border border-[#C4A484]/20 rounded-lg text-sm text-gray-600 hover:bg-[#C4A484]/10 transition-colors">
@@ -187,4 +171,4 @@ const Products = () => {
     );
 };
 
-export default Products; 
+export default Users; 
