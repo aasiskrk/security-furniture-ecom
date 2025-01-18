@@ -16,42 +16,77 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    brand: {
-      type: String,
-      required: true,
-    },
     category: {
       type: String,
       required: true,
-      enum: ["Gaming", "Business", "Student", "Workstation", "Ultrabook"],
+      enum: [
+        "Living Room",
+        "Bedroom",
+        "Dining Room",
+        "Office",
+        "Outdoor",
+        "Storage",
+        "Kids",
+        "Other",
+      ],
     },
-    specifications: {
-      processor: String,
-      ram: String,
-      storage: String,
-      display: String,
-      graphics: String,
-      battery: String,
-      weight: String,
-      ports: [String],
+    subCategory: {
+      type: String,
+      required: true,
+      enum: [
+        "Sofa",
+        "Chair",
+        "Table",
+        "Bed",
+        "Wardrobe",
+        "Dresser",
+        "Dining Set",
+        "Bookshelf",
+        "Cabinet",
+        "Desk",
+        "Outdoor Set",
+        "Storage Unit",
+        "Kids Furniture",
+        "Other",
+      ],
+    },
+    dimensions: {
+      length: { type: Number, required: true },
+      width: { type: Number, required: true },
+      height: { type: Number, required: true },
+      unit: { type: String, default: "inches", enum: ["inches", "cm"] },
+    },
+    colors: [
+      {
+        name: { type: String, required: true },
+        code: { type: String, required: true }, // Hex color code
+      },
+    ],
+    material: {
+      type: String,
+      required: true,
+    },
+    pictures: [
+      {
+        type: String,
+        required: true,
+      },
+    ],
+    features: [
+      {
+        type: String,
+      },
+    ],
+
+    weight: {
+      value: { type: Number, required: true },
+      unit: { type: String, default: "kg", enum: ["kg", "lbs"] },
     },
     countInStock: {
       type: Number,
       required: true,
       min: 0,
       default: 0,
-    },
-    rating: {
-      type: Number,
-      default: 0,
-    },
-    numReviews: {
-      type: Number,
-      default: 0,
-    },
-    image: {
-      type: String,
-      required: true,
     },
   },
   {

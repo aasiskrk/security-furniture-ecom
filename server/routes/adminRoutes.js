@@ -13,13 +13,13 @@ const {
 } = require("../controllers/productController");
 const {
   getAllUsers,
-  getDashboardStats,
+  // getDashboardStats,
   updateUserRole,
   deleteUser,
 } = require("../controllers/adminController");
 
 // Dashboard
-router.get("/dashboard", protect, admin, getDashboardStats);
+// router.get("/dashboard", protect, admin, getDashboardStats);
 
 // User management routes
 router.get("/users", protect, admin, getAllUsers);
