@@ -3,6 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { FiSearch, FiShoppingCart, FiHeart, FiUser, FiChevronDown } from 'react-icons/fi';
 import { PiArmchairDuotone } from 'react-icons/pi';
+import Cookies from 'js-cookie';
+
+const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
+const CART_COOKIE_KEY = 'furniture_cart';
 
 const Navbar = () => {
     const { user, logout } = useAuth();
@@ -12,6 +16,8 @@ const Navbar = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeDropdown, setActiveDropdown] = useState(null);
     const location = useLocation();
+    const [wishlistCount, setWishlistCount] = useState(0);
+    const [cartCount, setCartCount] = useState(0);
 
     // Check if current path is an admin page
     const isAdminPage = location.pathname.startsWith('/admin');
@@ -55,6 +61,60 @@ const Navbar = () => {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, [lastScrollY]);
+
+    // Add effect to update wishlist count
+    useEffect(() => {
+        const updateWishlistCount = () => {
+            const wishlistIds = JSON.parse(Cookies.get(WISHLIST_COOKIE_KEY) || '[]');
+            setWishlistCount(wishlistIds.length);
+        };
+
+        // Initial count
+        updateWishlistCount();
+
+        // Listen for storage changes (in case wishlist is updated in another tab)
+        const handleStorageChange = (e) => {
+            if (e.key === WISHLIST_COOKIE_KEY) {
+                updateWishlistCount();
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+
+        // Custom event for wishlist updates within the same tab
+        window.addEventListener('wishlistUpdated', updateWishlistCount);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('wishlistUpdated', updateWishlistCount);
+        };
+    }, []);
+
+    // Add effect to update cart count
+    useEffect(() => {
+        const updateCartCount = () => {
+            const cartData = JSON.parse(Cookies.get(CART_COOKIE_KEY) || '[]');
+            setCartCount(cartData.length);
+        };
+
+        // Initial count
+        updateCartCount();
+
+        // Listen for storage changes
+        const handleStorageChange = (e) => {
+            if (e.key === CART_COOKIE_KEY) {
+                updateCartCount();
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('cartUpdated', updateCartCount);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('cartUpdated', updateCartCount);
+        };
+    }, []);
 
     const scrollToTop = () => {
         window.scrollTo({
@@ -137,12 +197,21 @@ const Navbar = () => {
 
                         {/* Right Actions */}
                         <div className="flex items-center space-x-6 ml-auto">
-                            <Link to="/wishlist" className="text-[#333333] hover:text-[#C4A484] transition-colors">
-                                <FiHeart className="w-6 h-6" />
+                            <Link to="/wishlist" className="relative">
+                                <FiHeart className="w-6 h-6 text-[#333333] hover:text-[#C4A484] transition-colors" />
+                                {wishlistCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-[#C4A484] text-white text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center">
+                                        {wishlistCount}
+                                    </span>
+                                )}
                             </Link>
                             <Link to="/cart" className="relative">
                                 <FiShoppingCart className="w-6 h-6 text-[#333333] hover:text-[#C4A484] transition-colors" />
-                                <span className="absolute -top-2 -right-2 bg-[#C4A484] text-white text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                                {cartCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-[#C4A484] text-white text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center">
+                                        {cartCount}
+                                    </span>
+                                )}
                             </Link>
                             {user ? (
                                 <div className="relative group">

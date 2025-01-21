@@ -1,45 +1,153 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiMinus, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
+import { getProductByIdApi } from '../api/apis.js';
+
+const CART_COOKIE_KEY = 'furniture_cart';
 
 const Cart = () => {
-    // Sample cart data
-    const [cartItems, setCartItems] = useState([
-        {
-            id: 1,
-            name: 'Modern Leather Sofa',
-            price: 2499999,
-            color: 'Brown',
-            quantity: 1,
-            image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3'
-        },
-        {
-            id: 2,
-            name: 'Dining Table Set',
-            price: 1899999,
-            color: 'Natural Wood',
-            quantity: 1,
-            image: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?ixlib=rb-4.0.3'
-        }
-    ]);
+    const [cartItems, setCartItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Load cart from cookie and fetch product details
+    useEffect(() => {
+        const loadCart = async () => {
+            try {
+                setLoading(true);
+                // Get cart items from cookie
+                const cartData = JSON.parse(Cookies.get(CART_COOKIE_KEY) || '[]');
+
+                if (cartData.length === 0) {
+                    setCartItems([]);
+                    setLoading(false);
+                    return;
+                }
+
+                // Fetch product details for each cart item
+                const itemPromises = cartData.map(async (cartItem) => {
+                    try {
+                        const response = await getProductByIdApi(cartItem.productId);
+                        const product = response.data;
+                        return {
+                            id: product._id,
+                            name: product.name,
+                            price: product.price,
+                            color: cartItem.color || product.colors[0]?.name || 'N/A',
+                            quantity: cartItem.quantity,
+                            image: product.pictures[0],
+                            countInStock: product.countInStock
+                        };
+                    } catch (error) {
+                        console.error(`Error fetching product ${cartItem.productId}:`, error);
+                        return null;
+                    }
+                });
+
+                const items = (await Promise.all(itemPromises)).filter(item => item !== null);
+                setCartItems(items);
+            } catch (error) {
+                console.error('Error loading cart:', error);
+                toast.error('Failed to load cart items');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadCart();
+    }, []);
 
     const updateQuantity = (id, change) => {
-        setCartItems(items =>
-            items.map(item =>
-                item.id === id
-                    ? { ...item, quantity: Math.max(1, item.quantity + change) }
-                    : item
-            )
-        );
+        try {
+            const updatedItems = cartItems.map(item => {
+                if (item.id === id) {
+                    const newQuantity = Math.max(1, Math.min(item.countInStock, item.quantity + change));
+                    return { ...item, quantity: newQuantity };
+                }
+                return item;
+            });
+
+            setCartItems(updatedItems);
+
+            // Update cookie
+            const cookieData = updatedItems.map(item => ({
+                productId: item.id,
+                quantity: item.quantity,
+                color: item.color
+            }));
+            Cookies.set(CART_COOKIE_KEY, JSON.stringify(cookieData), { expires: 30 });
+
+            // Dispatch event to update cart count in navbar
+            window.dispatchEvent(new Event('cartUpdated'));
+        } catch (error) {
+            console.error('Error updating quantity:', error);
+            toast.error('Failed to update quantity');
+        }
     };
 
     const removeItem = (id) => {
-        setCartItems(items => items.filter(item => item.id !== id));
+        try {
+            const updatedItems = cartItems.filter(item => item.id !== id);
+            setCartItems(updatedItems);
+
+            // Update cookie
+            const cookieData = updatedItems.map(item => ({
+                productId: item.id,
+                quantity: item.quantity,
+                color: item.color
+            }));
+            Cookies.set(CART_COOKIE_KEY, JSON.stringify(cookieData), { expires: 30 });
+
+            toast.success('Item removed from cart');
+
+            // Dispatch event to update cart count in navbar
+            window.dispatchEvent(new Event('cartUpdated'));
+        } catch (error) {
+            console.error('Error removing item:', error);
+            toast.error('Failed to remove item');
+        }
     };
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shipping = 50000; // Fixed shipping cost
+    const shipping = cartItems.length > 0 ? 50000 : 0; // Fixed shipping cost
     const total = subtotal + shipping;
+
+    if (loading) {
+        return (
+            <div className="max-w-[2000px] mx-auto px-6 py-8">
+                <div className="flex flex-col lg:flex-row gap-12">
+                    <div className="lg:w-2/3">
+                        <div className="h-8 w-48 bg-gray-200 rounded mb-8 animate-pulse"></div>
+                        <div className="space-y-6">
+                            {[1, 2, 3].map((item) => (
+                                <div key={item} className="bg-white rounded-xl border border-[#C4A484]/10 p-6">
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-24 h-24 bg-gray-200 rounded-lg animate-pulse"></div>
+                                        <div className="flex-1 space-y-3">
+                                            <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                                            <div className="h-4 w-1/2 bg-gray-200 rounded"></div>
+                                            <div className="h-4 w-1/4 bg-gray-200 rounded"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="lg:w-1/3">
+                        <div className="bg-white rounded-xl border border-[#C4A484]/10 p-6 animate-pulse">
+                            <div className="h-6 w-32 bg-gray-200 rounded mb-6"></div>
+                            <div className="space-y-4">
+                                <div className="h-4 w-full bg-gray-200 rounded"></div>
+                                <div className="h-4 w-full bg-gray-200 rounded"></div>
+                                <div className="h-4 w-full bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-[2000px] mx-auto px-6 py-8">
@@ -69,7 +177,7 @@ const Cart = () => {
                                     {/* Product Image */}
                                     <div className="w-24 h-24 flex-shrink-0">
                                         <img
-                                            src={item.image}
+                                            src={`http://localhost:5000${item.image}`}
                                             alt={item.name}
                                             className="w-full h-full object-cover rounded-lg"
                                         />
@@ -89,6 +197,7 @@ const Cart = () => {
                                         <button
                                             onClick={() => updateQuantity(item.id, -1)}
                                             className="p-1 rounded-lg hover:bg-[#F8F5F1] text-gray-600 transition-colors"
+                                            disabled={item.quantity <= 1}
                                         >
                                             <FiMinus className="w-5 h-5" />
                                         </button>
@@ -98,6 +207,7 @@ const Cart = () => {
                                         <button
                                             onClick={() => updateQuantity(item.id, 1)}
                                             className="p-1 rounded-lg hover:bg-[#F8F5F1] text-gray-600 transition-colors"
+                                            disabled={item.quantity >= item.countInStock}
                                         >
                                             <FiPlus className="w-5 h-5" />
                                         </button>
@@ -139,9 +249,12 @@ const Cart = () => {
                                 </div>
                             </div>
 
-                            <button className="w-full bg-[#C4A484] text-white py-3 rounded-xl hover:bg-[#B39374] transition-colors mb-4">
+                            <Link
+                                to="/checkout"
+                                className="block w-full bg-[#C4A484] text-white text-center py-3 rounded-xl hover:bg-[#B39374] transition-colors mb-4"
+                            >
                                 Proceed to Checkout
-                            </button>
+                            </Link>
 
                             <Link
                                 to="/shop"

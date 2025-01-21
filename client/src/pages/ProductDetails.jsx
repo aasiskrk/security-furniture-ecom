@@ -1,51 +1,147 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { FaHeart } from 'react-icons/fa';
+import { useParams, useLocation, Link } from 'react-router-dom';
+import { FaHeart, FaRegHeart } from 'react-icons/fa';
+import { getProductByIdApi, getAllProductsApi } from '../api/apis.js';
+import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
+
+const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
+const CART_COOKIE_KEY = 'furniture_cart';
 
 const ProductDetails = () => {
     const { id } = useParams();
     const location = useLocation();
     const [selectedImage, setSelectedImage] = useState(0);
-    const [selectedColor, setSelectedColor] = useState('Black');
+    const [selectedColor, setSelectedColor] = useState(null);
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [moreProducts, setMoreProducts] = useState([]);
+    const [loadingMore, setLoadingMore] = useState(true);
 
-    // Sample product data (replace with actual API call)
-    const product = {
-        name: 'Modern Leather Sofa',
-        description: 'Experience luxury and comfort with our Modern Leather Sofa. Crafted with premium leather and a solid wood frame, this sofa combines contemporary design with exceptional durability. Perfect for both modern and traditional living spaces, it offers unmatched comfort and timeless elegance.',
-        price: 2499999,
-        originalPrice: 2799999,
-        inStock: true,
-        rating: 4.8,
-        reviews: 24,
-        specs: {
-            material: 'Premium Leather',
-            frame: 'Solid Wood',
-            colors: [
-                { name: 'Black', code: '#000000' },
-                { name: 'Brown', code: '#8B4513' },
-                { name: 'Tan', code: '#D2B48C' }
-            ],
-            dimensions: {
-                width: 220,
-                height: 85,
-                depth: 95
-            },
-            weight: '45 kg'
-        },
-        features: [
-            'Premium leather upholstery',
-            'High-density foam cushions',
-            'Solid wood frame construction',
-            'Ergonomic design for maximum comfort',
-            'Stain-resistant coating'
-        ],
-        images: [
-            'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3',
-            'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?ixlib=rb-4.0.3',
-            'https://images.unsplash.com/photo-1550226891-ef816aed4a98?ixlib=rb-4.0.3',
-            'https://images.unsplash.com/photo-1567016432779-094069958ea5?ixlib=rb-4.0.3'
-        ]
+    // Check if product is in wishlist
+    useEffect(() => {
+        const wishlistIds = JSON.parse(Cookies.get(WISHLIST_COOKIE_KEY) || '[]');
+        setIsWishlisted(wishlistIds.includes(id));
+    }, [id]);
+
+    const toggleWishlist = () => {
+        try {
+            const wishlistIds = JSON.parse(Cookies.get(WISHLIST_COOKIE_KEY) || '[]');
+            let updatedIds;
+
+            if (isWishlisted) {
+                updatedIds = wishlistIds.filter(itemId => itemId !== id);
+                toast.success('Removed from wishlist');
+            } else {
+                if (wishlistIds.includes(id)) {
+                    toast.error('Item already in wishlist');
+                    return;
+                }
+                updatedIds = [...wishlistIds, id];
+                toast.success('Added to wishlist');
+            }
+
+            Cookies.set(WISHLIST_COOKIE_KEY, JSON.stringify(updatedIds), { expires: 30 });
+            setIsWishlisted(!isWishlisted);
+
+            // Dispatch custom event to update navbar badge
+            window.dispatchEvent(new Event('wishlistUpdated'));
+        } catch (error) {
+            console.error('Error updating wishlist:', error);
+            toast.error('Failed to update wishlist');
+        }
     };
+
+    const handleAddToCart = () => {
+        try {
+            if (!selectedColor) {
+                toast.error('Please select a color');
+                return;
+            }
+
+            const cartData = JSON.parse(Cookies.get(CART_COOKIE_KEY) || '[]');
+
+            // Check if product is already in cart with same color
+            const existingItem = cartData.find(item =>
+                item.productId === id && item.color === selectedColor
+            );
+
+            if (existingItem) {
+                // Update quantity if not exceeding stock
+                if (existingItem.quantity < product.countInStock) {
+                    existingItem.quantity += 1;
+                    Cookies.set(CART_COOKIE_KEY, JSON.stringify(cartData), { expires: 30 });
+                    toast.success('Updated quantity in cart');
+                } else {
+                    toast.error('Maximum stock limit reached');
+                    return;
+                }
+            } else {
+                // Add new item
+                cartData.push({
+                    productId: id,
+                    quantity: 1,
+                    color: selectedColor
+                });
+                Cookies.set(CART_COOKIE_KEY, JSON.stringify(cartData), { expires: 30 });
+                toast.success('Added to cart');
+            }
+
+            // Dispatch event to update cart count in navbar
+            window.dispatchEvent(new Event('cartUpdated'));
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            toast.error('Failed to add to cart');
+        }
+    };
+
+    useEffect(() => {
+        const fetchProduct = async () => {
+            try {
+                setLoading(true);
+                const response = await getProductByIdApi(id);
+                setProduct(response.data);
+                // Set initial selected color
+                if (response.data.colors && response.data.colors.length > 0) {
+                    setSelectedColor(response.data.colors[0].name);
+                }
+            } catch (error) {
+                toast.error('Failed to fetch product details');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProduct();
+    }, [id]);
+
+    // Fetch more products
+    useEffect(() => {
+        const fetchMoreProducts = async () => {
+            try {
+                setLoadingMore(true);
+                const response = await getAllProductsApi();
+                const allProducts = response.data.products;
+
+                // Filter out the current product and get random 4 products
+                const otherProducts = allProducts
+                    .filter(p => p._id !== id)
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, 4);
+
+                setMoreProducts(otherProducts);
+            } catch (error) {
+                console.error('Error fetching more products:', error);
+            } finally {
+                setLoadingMore(false);
+            }
+        };
+
+        if (product) {
+            fetchMoreProducts();
+        }
+    }, [id, product]);
 
     // Hide category section when on product details page
     useEffect(() => {
@@ -54,6 +150,39 @@ const ProductDetails = () => {
         return () => body.classList.remove('hide-categories');
     }, []);
 
+    if (loading) {
+        return (
+            <div className="max-w-[2000px] mx-auto px-6 py-8 bg-white">
+                <div className="flex flex-col lg:flex-row gap-12">
+                    <div className="lg:w-1/2 animate-pulse">
+                        <div className="aspect-w-16 aspect-h-12 rounded-xl bg-gray-200 mb-4"></div>
+                        <div className="grid grid-cols-4 gap-4">
+                            {[1, 2, 3, 4].map((_, index) => (
+                                <div key={index} className="aspect-w-1 aspect-h-1 rounded-xl bg-gray-200"></div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="lg:w-1/2 space-y-4">
+                        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+                        <div className="h-10 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-24 bg-gray-200 rounded"></div>
+                        <div className="h-12 bg-gray-200 rounded w-1/3"></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!product) {
+        return (
+            <div className="max-w-[2000px] mx-auto px-6 py-8 bg-white">
+                <div className="text-center text-gray-600">
+                    Product not found
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-[2000px] mx-auto px-6 py-8 bg-white">
             <div className="flex flex-col lg:flex-row gap-12">
@@ -61,20 +190,24 @@ const ProductDetails = () => {
                 <div className="lg:w-1/2">
                     <div className="aspect-w-16 aspect-h-12 rounded-xl overflow-hidden mb-4">
                         <img
-                            src={product.images[selectedImage]}
+                            src={`http://localhost:5000${product.pictures[selectedImage]}`}
                             alt={product.name}
                             className="w-full h-full object-cover"
                         />
                     </div>
                     <div className="grid grid-cols-4 gap-4">
-                        {product.images.map((image, index) => (
+                        {product.pictures.map((image, index) => (
                             <button
                                 key={index}
                                 onClick={() => setSelectedImage(index)}
                                 className={`aspect-w-1 aspect-h-1 rounded-xl overflow-hidden border-2 ${selectedImage === index ? 'border-[#C4A484]' : 'border-transparent'
                                     }`}
                             >
-                                <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />
+                                <img
+                                    src={`http://localhost:5000${image}`}
+                                    alt={`${product.name} ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                />
                             </button>
                         ))}
                     </div>
@@ -84,26 +217,11 @@ const ProductDetails = () => {
                 <div className="lg:w-1/2">
                     {/* Status and Rating */}
                     <div className="flex items-center justify-between mb-6">
-                        {product.inStock ? (
+                        {product.countInStock > 0 ? (
                             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">In Stock</span>
                         ) : (
                             <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Out of Stock</span>
                         )}
-                        <div className="flex items-center gap-2">
-                            <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                    <svg
-                                        key={i}
-                                        className={`w-5 h-5 ${i < Math.floor(product.rating) ? 'text-[#C4A484]' : 'text-gray-300'}`}
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                    >
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                ))}
-                            </div>
-                            <span className="text-gray-600">({product.reviews} reviews)</span>
-                        </div>
                     </div>
 
                     {/* Product Title and Description */}
@@ -113,9 +231,6 @@ const ProductDetails = () => {
                     {/* Price */}
                     <div className="flex items-center gap-4 mb-8">
                         <span className="text-3xl font-bold text-[#8B5E34]">Rp {product.price.toLocaleString()}</span>
-                        {product.originalPrice && (
-                            <span className="text-xl text-gray-400 line-through">Rp {product.originalPrice.toLocaleString()}</span>
-                        )}
                     </div>
 
                     {/* Key Specifications */}
@@ -125,17 +240,16 @@ const ProductDetails = () => {
                             <div>
                                 <h4 className="text-sm font-medium text-gray-900 mb-2">Dimensions</h4>
                                 <div className="space-y-2 text-sm text-gray-600">
-                                    <p>Width: {product.specs.dimensions.width} cm</p>
-                                    <p>Height: {product.specs.dimensions.height} cm</p>
-                                    <p>Depth: {product.specs.dimensions.depth} cm</p>
+                                    <p>Length: {product.dimensions.length} {product.dimensions.unit}</p>
+                                    <p>Width: {product.dimensions.width} {product.dimensions.unit}</p>
+                                    <p>Height: {product.dimensions.height} {product.dimensions.unit}</p>
                                 </div>
                             </div>
                             <div>
                                 <h4 className="text-sm font-medium text-gray-900 mb-2">Material & Weight</h4>
                                 <div className="space-y-2 text-sm text-gray-600">
-                                    <p>Material: {product.specs.material}</p>
-                                    <p>Frame: {product.specs.frame}</p>
-                                    <p>Weight: {product.specs.weight}</p>
+                                    <p>Material: {product.material}</p>
+                                    <p>Weight: {product.weight.value} {product.weight.unit}</p>
                                 </div>
                             </div>
                         </div>
@@ -160,7 +274,7 @@ const ProductDetails = () => {
                     <div className="mb-8">
                         <h3 className="text-lg font-serif font-semibold text-gray-900 mb-4">Color</h3>
                         <div className="flex gap-4">
-                            {product.specs.colors.map(color => (
+                            {product.colors.map(color => (
                                 <button
                                     key={color.name}
                                     onClick={() => setSelectedColor(color.name)}
@@ -181,14 +295,76 @@ const ProductDetails = () => {
 
                     {/* Add to Cart and Wishlist */}
                     <div className="flex gap-4">
-                        <button className="flex-1 bg-[#C4A484] text-white px-8 py-3 rounded-xl hover:bg-[#B39374] transition-colors">
-                            Add to Cart
+                        <button
+                            onClick={handleAddToCart}
+                            className={`flex-1 px-8 py-3 rounded-xl transition-colors ${product.countInStock > 0
+                                ? 'bg-[#C4A484] text-white hover:bg-[#B39374]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                }`}
+                            disabled={product.countInStock === 0}
+                        >
+                            {product.countInStock > 0 ? 'Add to Cart' : 'Out of Stock'}
                         </button>
-                        <button className="p-3 rounded-xl border border-[#C4A484]/20 hover:border-[#C4A484] transition-colors">
-                            <FaHeart className="w-6 h-6 text-gray-400 hover:text-[#C4A484]" />
+                        <button
+                            onClick={toggleWishlist}
+                            className="p-3 rounded-xl border border-[#C4A484]/20 hover:border-[#C4A484] transition-colors"
+                        >
+                            {isWishlisted ? (
+                                <FaHeart className="w-6 h-6 text-[#C4A484]" />
+                            ) : (
+                                <FaRegHeart className="w-6 h-6 text-gray-400 hover:text-[#C4A484]" />
+                            )}
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* More Products Section */}
+            <div className="max-w-[2000px] mx-auto px-6 mt-24 mb-12">
+                <h2 className="text-2xl font-serif font-bold text-gray-900 mb-8">More Products You May Like</h2>
+
+                {loadingMore ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4].map((_, index) => (
+                            <div key={index} className="animate-pulse">
+                                <div className="aspect-square bg-gray-200 rounded-lg mb-4"></div>
+                                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {moreProducts.map((product) => (
+                            <Link
+                                key={product._id}
+                                to={`/product/${product._id}`}
+                                className="group"
+                            >
+                                <div className="bg-white rounded-lg overflow-hidden border-2 border-[#C4A484]/10 shadow-sm hover:shadow-lg transition-all duration-150">
+                                    <div className="aspect-square overflow-hidden">
+                                        <img
+                                            src={`http://localhost:5000${product.pictures[0]}`}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                        />
+                                    </div>
+                                    <div className="p-4">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2 group-hover:text-[#C4A484] transition-colors">
+                                            {product.name}
+                                        </h3>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600">{product.category}</span>
+                                            <span className="font-medium text-[#8B5E34]">
+                                                Rp {product.price.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

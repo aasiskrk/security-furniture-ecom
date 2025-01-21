@@ -18,6 +18,7 @@ import { AuthProvider } from './context/AuthContext';
 import Products from './pages/admin/Products';
 import Users from './pages/admin/Users';
 import AdminOrders from './pages/admin/AdminOrders';
+import OrderDetails from './pages/OrderDetails';
 
 const AppContent = () => {
   const location = useLocation();
@@ -36,13 +37,14 @@ const AppContent = () => {
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/shop" element={<Shop />} />
-          <Route path= "/wishlist" element={<Wishlist />} />
+          <Route path="/wishlist" element={<Wishlist />} />
 
           {/* Protected Routes */}
           <Route element={<PrivateRoute />}>
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/orders" element={<UserOrders />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/order/:orderId" element={<OrderDetails />} />
           </Route>
 
           {/* Admin Routes */}

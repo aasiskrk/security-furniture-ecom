@@ -7,54 +7,73 @@ const orderSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    items: [
+    orderItems: [
       {
+        name: { type: String, required: true },
+        quantity: { type: Number, required: true },
+        price: { type: Number, required: true },
+        color: { type: String, required: true },
         product: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Product",
           required: true,
         },
-        quantity: {
-          type: Number,
-          required: true,
-          min: 1,
-        },
-        price: {
-          type: Number,
-          required: true,
-        },
-        selectedColor: {
-          name: { type: String, required: true },
-          code: { type: String, required: true }, // Hex color code
-        },
       },
     ],
     shippingAddress: {
+      fullName: { type: String, required: true },
+      phone: { type: String, required: true },
       address: { type: String, required: true },
       city: { type: String, required: true },
-      postalCode: { type: String, required: true },
-      country: { type: String, required: true },
+      state: { type: String, required: true },
+      pinCode: { type: String, required: true },
     },
     paymentMethod: {
       type: String,
       required: true,
-      enum: ["COD", "Esewa", ""],
+      enum: ["COD", "eSewa"],
     },
-    paymentStatus: {
-      type: String,
-      required: true,
-      enum: ["Pending", "Completed", "Failed"],
-      default: "Pending",
+    paymentResult: {
+      // For eSewa payments
+      status: { type: String },
+      transactionId: { type: String },
+      amount: { type: Number },
+      referenceId: { type: String },
+      productId: { type: String },
     },
-    orderStatus: {
-      type: String,
-      required: true,
-      enum: ["Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Processing",
-    },
-    totalAmount: {
+    totalPrice: {
       type: Number,
       required: true,
+      default: 0.0,
+    },
+    status: {
+      type: String,
+      required: true,
+      enum: [
+        "Payment Pending",
+        "Pending",
+        "Processing",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
+      ],
+      default: "Pending",
+    },
+    isPaid: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    paidAt: {
+      type: Date,
+    },
+    isDelivered: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    deliveredAt: {
+      type: Date,
     },
   },
   { timestamps: true }

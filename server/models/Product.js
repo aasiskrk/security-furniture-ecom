@@ -23,10 +23,11 @@ const productSchema = new mongoose.Schema(
         "Living Room",
         "Bedroom",
         "Dining Room",
+        "Kitchen",
         "Office",
         "Outdoor",
-        "Storage",
         "Kids",
+        "Storage",
         "Other",
       ],
     },
@@ -34,20 +35,71 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        "Sofa",
-        "Chair",
-        "Table",
-        "Bed",
-        "Wardrobe",
-        "Dresser",
-        "Dining Set",
-        "Bookshelf",
-        "Cabinet",
-        "Desk",
-        "Outdoor Set",
-        "Storage Unit",
-        "Kids Furniture",
-        "Other",
+        // Living Room
+        "Sofas",
+        "Coffee Tables",
+        "TV Stands",
+        "Armchairs",
+        "Side Tables",
+        "Bookcases",
+
+        // Bedroom
+        "Beds",
+        "Wardrobes",
+        "Dressers",
+        "Nightstands",
+        "Bedroom Sets",
+        "Mattresses",
+
+        // Dining Room
+        "Dining Tables",
+        "Dining Chairs",
+        "Dining Sets",
+        "Buffets & Sideboards",
+        "Bar Furniture",
+
+        // Kitchen
+        "Kitchen Islands",
+        "Bar Stools",
+        "Kitchen Storage",
+        "Kitchen Tables",
+        "Kitchen Chairs",
+
+        // Office
+        "Desks",
+        "Office Chairs",
+        "Filing Cabinets",
+        "Office Sets",
+
+        // Outdoor
+        "Outdoor Sets",
+        "Outdoor Tables",
+        "Outdoor Chairs",
+        "Outdoor Sofas",
+        "Garden Furniture",
+
+        // Kids
+        "Kids Beds",
+        "Study Tables",
+        "Storage Units",
+        "Play Furniture",
+        "Kids Chairs",
+
+        // Storage
+        "Cabinets",
+        "Shelving Units",
+        "Storage Boxes",
+        "Wall Storage",
+        "Shoe Storage",
+        "Coat Racks",
+
+        // Other
+        "Mirrors",
+        "Room Dividers",
+        "Bean Bags",
+        "Accent Furniture",
+        "Decorative Items",
+        "Miscellaneous",
       ],
     },
     dimensions: {

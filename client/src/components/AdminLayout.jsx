@@ -20,12 +20,7 @@ const AdminLayout = ({ children }) => {
             name: 'Order Management',
             icon: <FiShoppingBag className="w-5 h-5" />
         },
-        {
-            path: '/admin/categories',
-            name: 'Category Management',
-            icon: <FiGrid className="w-5 h-5" />
-        }
-    ];
+            ];
 
     return (
         <div className="flex h-[calc(100vh-3.5rem)]">

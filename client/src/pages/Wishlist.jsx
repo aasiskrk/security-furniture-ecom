@@ -1,42 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiHeart, FiShoppingCart, FiTrash2 } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
+import { getProductByIdApi } from '../api/apis.js';
+
+const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 
 const Wishlist = () => {
-    // Sample wishlist data
-    const [wishlistItems, setWishlistItems] = useState([
-        {
-            id: 1,
-            name: 'Modern Leather Sofa',
-            price: 2499999,
-            color: 'Brown',
-            category: 'Living Room',
-            image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3',
-            inStock: true
-        },
-        {
-            id: 2,
-            name: 'Dining Table Set',
-            price: 1899999,
-            color: 'Natural Wood',
-            category: 'Dining Room',
-            image: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?ixlib=rb-4.0.3',
-            inStock: true
-        },
-        {
-            id: 3,
-            name: 'Queen Size Bed Frame',
-            price: 1299999,
-            color: 'White Oak',
-            category: 'Bedroom',
-            image: 'https://images.unsplash.com/photo-1505693314120-0d443867891c?ixlib=rb-4.0.3',
-            inStock: false
-        }
-    ]);
+    const [wishlistItems, setWishlistItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Load wishlist from cookie and fetch product details
+    useEffect(() => {
+        const loadWishlist = async () => {
+            try {
+                setLoading(true);
+                // Get product IDs from cookie
+                const wishlistIds = JSON.parse(Cookies.get(WISHLIST_COOKIE_KEY) || '[]');
+
+                if (wishlistIds.length === 0) {
+                    setWishlistItems([]);
+                    return;
+                }
+
+                // Fetch product details for each ID
+                const productPromises = wishlistIds.map(id => getProductByIdApi(id));
+                const products = await Promise.all(productPromises);
+
+                // Map the responses to our wishlist format
+                const items = products.map(response => {
+                    const product = response.data;
+                    return {
+                        id: product._id,
+                        name: product.name,
+                        price: product.price,
+                        color: product.colors[0]?.name || 'N/A',
+                        category: product.category,
+                        image: product.pictures[0], // First picture
+                        inStock: product.countInStock > 0,
+                        countInStock: product.countInStock
+                    };
+                });
+
+                setWishlistItems(items);
+            } catch (error) {
+                console.error('Error loading wishlist:', error);
+                toast.error('Failed to load wishlist items');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadWishlist();
+    }, []);
 
     const removeFromWishlist = (id) => {
-        setWishlistItems(items => items.filter(item => item.id !== id));
+        try {
+            // Remove from state
+            setWishlistItems(items => items.filter(item => item.id !== id));
+
+            // Remove from cookie
+            const wishlistIds = JSON.parse(Cookies.get(WISHLIST_COOKIE_KEY) || '[]');
+            const updatedIds = wishlistIds.filter(itemId => itemId !== id);
+            Cookies.set(WISHLIST_COOKIE_KEY, JSON.stringify(updatedIds), { expires: 30 }); // Expires in 30 days
+
+            toast.success('Removed from wishlist');
+        } catch (error) {
+            console.error('Error removing from wishlist:', error);
+            toast.error('Failed to remove item from wishlist');
+        }
     };
+
+    const addToCart = async (item) => {
+        try {
+            // Add to cart logic here
+            toast.success('Added to cart');
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            toast.error('Failed to add item to cart');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="max-w-[2000px] mx-auto px-6 py-8">
+                <div className="space-y-8">
+                    <div className="animate-pulse">
+                        <div className="h-8 w-48 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-[#C4A484]/10 overflow-hidden">
+                        {[1, 2, 3].map((item) => (
+                            <div key={item} className="p-6 border-b border-[#C4A484]/10">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-24 h-24 bg-gray-200 rounded-lg animate-pulse"></div>
+                                    <div className="flex-1 space-y-3">
+                                        <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                                        <div className="h-4 w-1/2 bg-gray-200 rounded"></div>
+                                        <div className="h-4 w-1/4 bg-gray-200 rounded"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-[2000px] mx-auto px-6 py-8">
@@ -55,7 +126,7 @@ const Wishlist = () => {
                                         <div className="flex items-center gap-6">
                                             <div className="flex-shrink-0">
                                                 <img
-                                                    src={item.image}
+                                                    src={`http://localhost:5000${item.image}`}
                                                     alt={item.name}
                                                     className="w-24 h-24 object-cover rounded-lg"
                                                 />
@@ -84,6 +155,7 @@ const Wishlist = () => {
                                                 </button>
                                                 {item.inStock ? (
                                                     <button
+                                                        onClick={() => addToCart(item)}
                                                         className="flex items-center gap-2 px-4 py-2 bg-[#C4A484] text-white rounded-lg hover:bg-[#B39374] transition-colors"
                                                     >
                                                         <FiShoppingCart className="w-4 h-4" />

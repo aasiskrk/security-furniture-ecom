@@ -1,42 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FiPlus } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
+import Cookies from 'js-cookie';
+import { addAddressApi, getAddressesApi, setDefaultAddressApi, createOrderApi, getProductByIdApi } from '../api/apis';
+
+const CART_COOKIE_KEY = 'furniture_cart';
 
 const Checkout = () => {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const [showAddressForm, setShowAddressForm] = useState(false);
     const [selectedAddress, setSelectedAddress] = useState(null);
+    const [addresses, setAddresses] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [cartItems, setCartItems] = useState([]);
+    const [loadingCart, setLoadingCart] = useState(true);
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const location = useLocation();
 
-    // Dummy cart data - replace with actual cart data
-    const cartItems = [
-        {
-            id: 1,
-            name: 'Modern Leather Sofa',
-            price: 2499999,
-            color: 'Brown',
-            quantity: 1,
-            image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3'
+    // Check for payment error message
+    useEffect(() => {
+        const paymentError = sessionStorage.getItem('paymentError');
+        if (paymentError) {
+            toast.error(paymentError);
+            sessionStorage.removeItem('paymentError');
         }
-    ];
+    }, []);
 
-    // Dummy address - replace with user's saved address from backend
-    const savedAddress = {
-        fullName: 'John Doe',
-        phone: '+1234567890',
-        address: '123 Main St',
-        city: 'New York',
-        state: 'NY',
-        pinCode: '10001'
-    };
+    // Check URL parameters for error
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('error') === 'payment-failed') {
+            toast.error('Payment failed. Please try again.');
+            // Clean up the URL
+            window.history.replaceState({}, '', '/checkout');
+        }
+    }, [location]);
 
-    const [addressForm, setAddressForm] = useState({
-        fullName: '',
-        phone: '',
-        address: '',
-        city: '',
-        state: '',
-        pinCode: ''
-    });
+    // Fetch cart items from cookie and get product details
+    useEffect(() => {
+        const loadCart = async () => {
+            try {
+                setLoadingCart(true);
+                // Get cart items from cookie
+                const cartData = JSON.parse(Cookies.get(CART_COOKIE_KEY) || '[]');
+
+                if (cartData.length === 0) {
+                    setCartItems([]);
+                    setLoadingCart(false);
+                    return;
+                }
+
+                // Fetch product details for each cart item
+                const itemPromises = cartData.map(async (cartItem) => {
+                    try {
+                        const response = await getProductByIdApi(cartItem.productId);
+                        const product = response.data;
+                        return {
+                            id: product._id,
+                            name: product.name,
+                            price: product.price,
+                            color: cartItem.color || product.colors[0]?.name || 'N/A',
+                            quantity: cartItem.quantity,
+                            image: product.pictures[0],
+                            countInStock: product.countInStock
+                        };
+                    } catch (error) {
+                        console.error(`Error fetching product ${cartItem.productId}:`, error);
+                        return null;
+                    }
+                });
+
+                const items = (await Promise.all(itemPromises)).filter(item => item !== null);
+                setCartItems(items);
+            } catch (error) {
+                console.error('Error loading cart:', error);
+                toast.error('Failed to load cart items');
+            } finally {
+                setLoadingCart(false);
+            }
+        };
+
+        loadCart();
+    }, []);
+
+    // Fetch addresses
+    useEffect(() => {
+        const fetchAddresses = async () => {
+            try {
+                const response = await getAddressesApi();
+                setAddresses(response.data);
+                // Set default address as selected if exists
+                const defaultAddress = response.data.find(addr => addr.isDefault);
+                if (defaultAddress) {
+                    setSelectedAddress(defaultAddress);
+                }
+            } catch (error) {
+                console.error('Error fetching addresses:', error);
+                toast.error('Failed to load addresses');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAddresses();
+    }, []);
 
     const handleAddressChange = (e) => {
         const { name, value } = e.target;
@@ -46,11 +117,34 @@ const Checkout = () => {
         }));
     };
 
-    const handleAddressSubmit = (e) => {
+    const handleAddressSubmit = async (e) => {
         e.preventDefault();
-        // Here you would typically save the address to the backend
-        setSelectedAddress(addressForm);
-        setShowAddressForm(false);
+        try {
+            const response = await addAddressApi(addressForm);
+            setAddresses(response.data.addresses);
+            setSelectedAddress(response.data.addresses[response.data.addresses.length - 1]);
+            setShowAddressForm(false);
+            toast.success('Address added successfully');
+        } catch (error) {
+            console.error('Error adding address:', error);
+            toast.error('Failed to add address');
+        }
+    };
+
+    const handleSelectAddress = async (address) => {
+        try {
+            await setDefaultAddressApi(address._id);
+            setSelectedAddress(address);
+            // Update addresses list to reflect new default
+            const updatedAddresses = addresses.map(addr => ({
+                ...addr,
+                isDefault: addr._id === address._id
+            }));
+            setAddresses(updatedAddresses);
+        } catch (error) {
+            console.error('Error setting default address:', error);
+            toast.error('Failed to select address');
+        }
     };
 
     const calculateSubtotal = () => {
@@ -58,8 +152,98 @@ const Checkout = () => {
     };
 
     const subtotal = calculateSubtotal();
-    const shipping = 50000; // Fixed shipping cost
+    const shipping = 0; // Set shipping cost to 0
     const total = subtotal + shipping;
+
+    const handlePlaceOrder = async () => {
+        if (!selectedAddress) {
+            toast.error('Please select a shipping address');
+            return;
+        }
+
+        if (!paymentMethod) {
+            toast.error('Please select a payment method');
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+
+            const orderData = {
+                orderItems: cartItems.map(item => ({
+                    product: item.id,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    color: item.color
+                })),
+                shippingAddress: {
+                    fullName: selectedAddress.fullName,
+                    phone: selectedAddress.phone,
+                    address: selectedAddress.address,
+                    city: selectedAddress.city,
+                    state: selectedAddress.state,
+                    pinCode: selectedAddress.pinCode
+                },
+                paymentMethod,
+            };
+
+            const response = await createOrderApi(orderData);
+
+            // Handle COD orders
+            if (paymentMethod === 'COD') {
+                // Clear cart
+                Cookies.remove(CART_COOKIE_KEY);
+                // Dispatch event to update cart count in navbar
+                window.dispatchEvent(new Event('cartUpdated'));
+                // Redirect to orders page
+                navigate(`/order/${response.data._id}`);
+                toast.success('Order placed successfully!');
+                return;
+            }
+
+            // Handle eSewa payment
+            if (paymentMethod === 'eSewa') {
+                const { esewaUrl, esewaData } = response.data;
+
+                // Create form and submit to eSewa
+                const form = document.createElement('form');
+                form.setAttribute('method', 'POST');
+                form.setAttribute('action', esewaUrl);
+
+                // Add eSewa parameters
+                Object.entries(esewaData).forEach(([key, value]) => {
+                    const input = document.createElement('input');
+                    input.setAttribute('type', 'hidden');
+                    input.setAttribute('name', key);
+                    input.setAttribute('value', value);
+                    form.appendChild(input);
+                });
+
+                document.body.appendChild(form);
+                form.submit();
+                return;
+            }
+        } catch (error) {
+            console.error('Error placing order:', error);
+            toast.error('Failed to place order. Please try again.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    if (loading || loadingCart) {
+        return (
+            <div className="min-h-screen bg-[#F8F5F1]/30 py-8">
+                <div className="max-w-[2000px] mx-auto px-6">
+                    <div className="animate-pulse">
+                        <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+                        <div className="h-64 bg-gray-200 rounded mb-4"></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#F8F5F1]/30 py-8">
@@ -92,24 +276,26 @@ const Checkout = () => {
                         <div className="bg-white p-6 rounded-xl border border-[#C4A484]/10">
                             <h2 className="text-xl font-serif font-bold text-gray-900 mb-6">Shipping & Billing Address</h2>
 
-                            {savedAddress && !showAddressForm && !selectedAddress && (
-                                <div className="mb-6">
-                                    <div className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{savedAddress.fullName}</p>
-                                                <p className="text-[#8B5E34] mt-1">{savedAddress.phone}</p>
-                                                <p className="text-[#8B5E34]">{savedAddress.address}</p>
-                                                <p className="text-[#8B5E34]">{savedAddress.city}, {savedAddress.state} {savedAddress.pinCode}</p>
+                            {addresses.length > 0 && !showAddressForm && !selectedAddress && (
+                                <div className="mb-6 space-y-4">
+                                    {addresses.map(address => (
+                                        <div key={address._id} className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{address.fullName}</p>
+                                                    <p className="text-[#8B5E34] mt-1">{address.phone}</p>
+                                                    <p className="text-[#8B5E34]">{address.address}</p>
+                                                    <p className="text-[#8B5E34]">{address.city}, {address.state} {address.pinCode}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleSelectAddress(address)}
+                                                    className="text-[#C4A484] hover:text-[#8B5E34] transition-colors text-sm font-medium"
+                                                >
+                                                    {address.isDefault ? 'Selected' : 'Select'}
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => setSelectedAddress(savedAddress)}
-                                                className="text-[#C4A484] hover:text-[#8B5E34] transition-colors text-sm font-medium"
-                                            >
-                                                Use this address
-                                            </button>
                                         </div>
-                                    </div>
+                                    ))}
                                 </div>
                             )}
 
@@ -244,10 +430,12 @@ const Checkout = () => {
                                                     <input
                                                         type="radio"
                                                         name="payment"
-                                                        value="card"
+                                                        value="COD"
+                                                        checked={paymentMethod === 'COD'}
+                                                        onChange={(e) => setPaymentMethod(e.target.value)}
                                                         className="h-4 w-4 text-[#C4A484] focus:ring-[#C4A484]"
                                                     />
-                                                    <span className="ml-3 text-gray-900">Credit/Debit Card</span>
+                                                    <span className="ml-3 text-gray-900">Cash on Delivery (COD)</span>
                                                 </label>
                                             </div>
                                             <div className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
@@ -255,10 +443,12 @@ const Checkout = () => {
                                                     <input
                                                         type="radio"
                                                         name="payment"
-                                                        value="cod"
+                                                        value="eSewa"
+                                                        checked={paymentMethod === 'eSewa'}
+                                                        onChange={(e) => setPaymentMethod(e.target.value)}
                                                         className="h-4 w-4 text-[#C4A484] focus:ring-[#C4A484]"
                                                     />
-                                                    <span className="ml-3 text-gray-900">Cash on Delivery (COD)</span>
+                                                    <span className="ml-3 text-gray-900">eSewa</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -291,7 +481,7 @@ const Checkout = () => {
                                 </div>
                                 <div className="flex justify-between mt-2">
                                     <dt className="text-sm text-[#8B5E34]">Shipping</dt>
-                                    <dd className="text-sm font-medium text-gray-900">Rp {shipping.toLocaleString()}</dd>
+                                    <dd className="text-sm font-medium text-gray-900">Free</dd>
                                 </div>
                                 <div className="flex justify-between mt-4 pt-4 border-t border-[#C4A484]/10">
                                     <dt className="text-base font-medium text-gray-900">Order total</dt>
@@ -299,13 +489,23 @@ const Checkout = () => {
                                 </div>
                             </div>
                             <div className="mt-6">
-                                <input
-                                    type="text"
-                                    placeholder="Enter discount code"
-                                    className="block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 mb-4 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                />
-                                <button className="w-full bg-[#C4A484] text-white py-3 rounded-xl hover:bg-[#B39374] transition-colors">
-                                    Apply Discount
+                                <button
+                                    onClick={handlePlaceOrder}
+                                    disabled={!selectedAddress || !paymentMethod || isProcessing || cartItems.length === 0}
+                                    className={`w-full py-3 rounded-xl transition-colors ${selectedAddress && paymentMethod && !isProcessing && cartItems.length > 0
+                                        ? 'bg-[#C4A484] text-white hover:bg-[#B39374]'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        }`}
+                                >
+                                    {isProcessing
+                                        ? 'Processing...'
+                                        : cartItems.length === 0
+                                            ? 'Your cart is empty'
+                                            : !selectedAddress
+                                                ? 'Select Address to Continue'
+                                                : !paymentMethod
+                                                    ? 'Select Payment Method'
+                                                    : 'Place Order'}
                                 </button>
                             </div>
                         </div>
