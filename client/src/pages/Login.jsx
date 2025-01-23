@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { PiArmchairDuotone } from 'react-icons/pi';
 import { FiMail, FiLock } from 'react-icons/fi';
+import { sanitizeEmail } from '../utils/sanitize';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -31,34 +32,33 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
-        if (!captchaToken) {
-            toast.error('Please complete the CAPTCHA');
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const userData = await login(formData.email, formData.password, captchaToken);
+            const sanitizedEmail = sanitizeEmail(formData.email);
+            if (!sanitizedEmail) {
+                toast.error('Please provide a valid email address');
+                setLoading(false);
+                return;
+            }
+
+            const sanitizedData = {
+                email: sanitizedEmail,
+                password: formData.password // Password is handled separately by bcrypt
+            };
+
+            const userData = await login(sanitizedData);
             
-            // Clear form data
-            setFormData({
-                email: '',
-                password: ''
-            });
-            
-            // Redirect based on user role or return URL
-            if (userData.role === 'admin') {
-                navigate('/admin');
+            if (userData?.role === 'admin') {
+                navigate('/admin/dashboard');
             } else {
-                navigate(from);
+                navigate('/profile');
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to login');
-        } finally {
-            setLoading(false);
+            console.error('Login error:', error);
+            toast.error(error.response?.data?.message || 'Login failed');
         }
+        setLoading(false);
     };
 
     return (
