@@ -6,6 +6,8 @@ import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { PiArmchairDuotone } from 'react-icons/pi';
 import { FiUser, FiMail, FiLock } from 'react-icons/fi';
 import zxcvbn from 'zxcvbn';
+import { sanitizeEmail, sanitizeName } from '../utils/sanitize';
+import axios from 'axios';
 
 const Register = () => {
     const [name, setName] = useState('');
@@ -22,40 +24,51 @@ const Register = () => {
         e.preventDefault();
         setLoading(true);
 
-        // Email format validation
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(email)) {
-            toast.error('Please enter a valid email address');
-            setLoading(false);
-            return;
-        }
-
-        // Password strength validation using zxcvbn
-        const passwordStrength = zxcvbn(password);
-        if (passwordStrength.score < 3) {
-            toast.error('Password is too weak. Please ensure it contains:');
-            toast.error('- At least 8 characters');
-            toast.error('- Uppercase and lowercase letters');
-            toast.error('- Numbers and special characters');
-            setLoading(false);
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            toast.error('Passwords do not match');
-            setLoading(false);
-            return;
-        }
-
         try {
-            await register(name, email, password);
-            toast.success('Registration successful!');
-            navigate('/');
+            const sanitizedName = sanitizeName(name);
+            const sanitizedEmail = sanitizeEmail(email);
+
+            if (!sanitizedName || !sanitizedEmail) {
+                toast.error('Please provide valid name and email');
+                setLoading(false);
+                return;
+            }
+
+            // Check password strength
+            const passwordStrength = zxcvbn(password);
+            if (passwordStrength.score < 3) {
+                toast.error('Please choose a stronger password. ' + passwordStrength.feedback.warning);
+                setLoading(false);
+                return;
+            }
+
+            // Check if passwords match
+            if (password !== confirmPassword) {
+                toast.error('Passwords do not match');
+                setLoading(false);
+                return;
+            }
+
+            const sanitizedData = {
+                name: sanitizedName,
+                email: sanitizedEmail,
+                password: password // Password is handled separately by bcrypt
+            };
+
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/auth/register`,
+                sanitizedData
+            );
+
+            if (response.data) {
+                toast.success('Registration successful! Please login.');
+                navigate('/login');
+            }
         } catch (error) {
+            console.error('Registration error:', error);
             toast.error(error.response?.data?.message || 'Registration failed');
-        } finally {
-            setLoading(false);
         }
+        setLoading(false);
     };
 
     return (
