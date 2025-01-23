@@ -33,6 +33,8 @@ const Navbar = () => {
     const isProfilePage = location.pathname.startsWith('/profile');
     const isCheckoutPage = location.pathname.startsWith('/checkout');
     const isWishlistPage = location.pathname.startsWith('/wishlist');
+    const isRegisterPage = location.pathname.startsWith('/register');
+    const isLoginPage = location.pathname.startsWith('/login');
 
     const furnitureCategories = {
         'Living Room': [
@@ -390,6 +392,7 @@ const Navbar = () => {
                                 <div className="relative group">
                                     <button className="flex items-center space-x-2 text-[#333333] hover:text-[#C4A484] transition-colors">
                                         <FiUser className="w-6 h-6" />
+                                        <span className="text-sm font-medium">{user.name}</span>
                                     </button>
                                     <div className="absolute right-0 w-48 mt-2 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                                         <div className="py-1">
@@ -414,7 +417,7 @@ const Navbar = () => {
                     </div>
 
                     {/* Bottom Section - Categories */}
-                    {!isAdminPage && !isProductDetail && !isOrderPage && !isCartPage && !isProfilePage && !isCheckoutPage && !isWishlistPage && (
+                    {!isAdminPage && !isProductDetail && !isOrderPage && !isCartPage && !isProfilePage && !isCheckoutPage && !isWishlistPage && !isRegisterPage && !isLoginPage && (
                         <div className={`hidden lg:block bg-[#DCC8AC] transition-all duration-300 border-t border-[#C4A484]/20 overflow-visible
                             ${isScrolled ? 'shadow-sm' : ''} 
                             ${hideCategories ? 'h-0 opacity-0' : 'h-14 opacity-100'}`}
