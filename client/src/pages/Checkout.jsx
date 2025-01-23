@@ -5,6 +5,8 @@ import { FiPlus } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import Cookies from 'js-cookie';
 import { addAddressApi, getAddressesApi, setDefaultAddressApi, createOrderApi, getProductByIdApi } from '../api/apis';
+import { sanitizeObject } from '../utils/sanitize';
+import axios from 'axios';
 
 const CART_COOKIE_KEY = 'furniture_cart';
 
@@ -129,48 +131,48 @@ const Checkout = () => {
 
     const handleAddressSubmit = async (e) => {
         e.preventDefault();
-
-        // Validate all fields are filled
-        const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pinCode'];
-        const emptyFields = requiredFields.filter(field => !addressForm[field].trim());
-
-        if (emptyFields.length > 0) {
-            toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`);
-            return;
-        }
-
-        // Validate phone number format (basic validation)
-        const phoneRegex = /^\d{10,12}$/;
-        if (!phoneRegex.test(addressForm.phone.replace(/[-\s]/g, ''))) {
-            toast.error('Please enter a valid phone number (10-12 digits)');
-            return;
-        }
-
-        // Validate PIN code (basic validation)
-        const pinCodeRegex = /^\d{5,6}$/;
-        if (!pinCodeRegex.test(addressForm.pinCode.replace(/\s/g, ''))) {
-            toast.error('Please enter a valid PIN code (5-6 digits)');
-            return;
-        }
+        setAddressLoading(true);
 
         try {
-            const response = await addAddressApi(addressForm);
-            setAddresses(response.data.addresses);
-            setSelectedAddress(response.data.addresses[response.data.addresses.length - 1]);
-            setShowAddressForm(false);
-            setAddressForm({
-                fullName: '',
-                phone: '',
-                address: '',
-                city: '',
-                state: '',
-                pinCode: ''
-            });
-            toast.success('Address added successfully');
+            const sanitizedAddress = sanitizeObject(addressForm);
+
+            // Validate sanitized data
+            if (!sanitizedAddress.fullName || !sanitizedAddress.phone || 
+                !sanitizedAddress.address || !sanitizedAddress.city || 
+                !sanitizedAddress.state || !sanitizedAddress.pinCode) {
+                toast.error('Please provide valid address details');
+                setAddressLoading(false);
+                return;
+            }
+
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/auth/address`,
+                sanitizedAddress,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                }
+            );
+
+            if (response.data) {
+                updateUser(response.data);
+                setAddressForm({
+                    fullName: '',
+                    phone: '',
+                    address: '',
+                    city: '',
+                    state: '',
+                    pinCode: '',
+                });
+                setShowAddressForm(false);
+                toast.success('Address added successfully');
+            }
         } catch (error) {
             console.error('Error adding address:', error);
-            toast.error(error.response?.data?.message || 'Failed to add address');
+            toast.error(error.response?.data?.message || 'Error adding address');
         }
+        setAddressLoading(false);
     };
 
     const handleSelectAddress = async (address) => {
@@ -199,79 +201,45 @@ const Checkout = () => {
 
     const handlePlaceOrder = async () => {
         if (!selectedAddress) {
-            toast.error('Please select a shipping address');
+            toast.error('Please select a delivery address');
             return;
         }
 
-        if (!paymentMethod) {
-            toast.error('Please select a payment method');
-            return;
-        }
-
+        setOrderLoading(true);
         try {
-            setIsProcessing(true);
-
             const orderData = {
-                orderItems: cartItems.map(item => ({
-                    product: item.id,
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    color: item.color
-                })),
-                shippingAddress: {
-                    fullName: selectedAddress.fullName,
-                    phone: selectedAddress.phone,
-                    address: selectedAddress.address,
-                    city: selectedAddress.city,
-                    state: selectedAddress.state,
-                    pinCode: selectedAddress.pinCode
-                },
+                address: selectedAddress._id,
                 paymentMethod,
+                items: cartItems.map(item => ({
+                    product: item.id,
+                    quantity: item.quantity,
+                    color: item.color
+                }))
             };
 
-            const response = await createOrderApi(orderData);
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_URL}/orders`,
+                orderData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                }
+            );
 
-            // Handle COD orders
-            if (paymentMethod === 'COD') {
-                // Clear cart
+            if (response.data) {
+                // Clear cart after successful order
                 Cookies.remove(CART_COOKIE_KEY);
                 // Dispatch event to update cart count in navbar
                 window.dispatchEvent(new Event('cartUpdated'));
-                // Redirect to orders page
-                navigate(`/order/${response.data._id}`);
                 toast.success('Order placed successfully!');
-                return;
-            }
-
-            // Handle eSewa payment
-            if (paymentMethod === 'eSewa') {
-                const { esewaUrl, esewaData } = response.data;
-
-                // Create form and submit to eSewa
-                const form = document.createElement('form');
-                form.setAttribute('method', 'POST');
-                form.setAttribute('action', esewaUrl);
-
-                // Add eSewa parameters
-                Object.entries(esewaData).forEach(([key, value]) => {
-                    const input = document.createElement('input');
-                    input.setAttribute('type', 'hidden');
-                    input.setAttribute('name', key);
-                    input.setAttribute('value', value);
-                    form.appendChild(input);
-                });
-
-                document.body.appendChild(form);
-                form.submit();
-                return;
+                navigate(`/orders/${response.data._id}`);
             }
         } catch (error) {
             console.error('Error placing order:', error);
-            toast.error('Failed to place order. Please try again.');
-        } finally {
-            setIsProcessing(false);
+            toast.error(error.response?.data?.message || 'Error placing order');
         }
+        setOrderLoading(false);
     };
 
     if (loading || loadingCart) {
