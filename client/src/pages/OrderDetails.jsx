@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FiArrowLeft, FiPackage, FiClock, FiMapPin, FiPhone } from 'react-icons/fi';
+import { FiArrowLeft, FiPackage, FiClock, FiMapPin, FiPhone, FiCheck, FiX, FiCalendar, FiCreditCard, FiTruck, FiAlertTriangle } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
-import { getOrderByIdApi } from '../api/apis';
+import { getOrderByIdApi, cancelOrderApi } from '../api/apis';
 import Cookies from 'js-cookie';
 
 const CART_COOKIE_KEY = 'furniture_cart';
@@ -13,6 +13,7 @@ const OrderDetails = () => {
     const location = useLocation();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isCancelling, setIsCancelling] = useState(false);
 
     // Check for payment success message
     useEffect(() => {
@@ -79,6 +80,33 @@ const OrderDetails = () => {
         }
     };
 
+    const getPaymentStatusColor = (isPaid) => {
+        return isPaid
+            ? 'bg-green-50 text-green-700 ring-green-600/20'
+            : 'bg-amber-50 text-amber-700 ring-amber-600/20';
+    };
+
+    // Add function to handle order cancellation
+    const handleCancelOrder = async () => {
+        if (!window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            setIsCancelling(true);
+            await cancelOrderApi(orderId);
+            toast.success('Order cancelled successfully');
+            // Refresh order details
+            const response = await getOrderByIdApi(orderId);
+            setOrder(response.data);
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            toast.error(error.response?.data?.message || 'Failed to cancel order');
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="max-w-[2000px] mx-auto px-6 py-12">
@@ -131,9 +159,36 @@ const OrderDetails = () => {
                             <h1 className="text-3xl font-serif font-bold text-gray-900">Order Details</h1>
                             <p className="mt-1 text-[#8B5E34]">Order #: {formatOrderId(order._id)}</p>
                         </div>
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getStatusColor(order.status)}`}>
-                            {order.status}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getStatusColor(order.status)}`}>
+                                <FiPackage className="w-4 h-4" />
+                                {order.status}
+                            </span>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getPaymentStatusColor(order.isPaid)}`}>
+                                {order.isPaid ? (
+                                    <>
+                                        <FiCheck className="w-4 h-4" />
+                                        Paid
+                                    </>
+                                ) : (
+                                    <>
+                                        <FiX className="w-4 h-4" />
+                                        Payment Pending
+                                    </>
+                                )}
+                            </span>
+                            {/* Cancel Order Button */}
+                            {(order.status === 'Pending' || order.status === 'Processing') && !order.isPaid && (
+                                <button
+                                    onClick={handleCancelOrder}
+                                    disabled={isCancelling}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg border border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <FiAlertTriangle className="w-4 h-4" />
+                                    {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -161,6 +216,11 @@ const OrderDetails = () => {
                                                 <p>Quantity: {item.quantity}</p>
                                                 <p>Price: Rp {item.price.toLocaleString()}</p>
                                             </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-medium text-gray-900">
+                                                Rp {(item.price * item.quantity).toLocaleString()}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -211,21 +271,23 @@ const OrderDetails = () => {
                         <div className="bg-white rounded-xl p-8 border border-[#C4A484]/10">
                             <h2 className="text-xl font-medium text-gray-900 mb-6">Payment Information</h2>
                             <div className="space-y-4">
-                                <div className="flex justify-between text-[#8B5E34]">
-                                    <span>Payment Method</span>
+                                <div className="flex items-center gap-3 text-[#8B5E34]">
+                                    <FiCreditCard className="w-5 h-5" />
                                     <span>{order.paymentMethod}</span>
                                 </div>
-                                <div className="flex justify-between text-[#8B5E34]">
-                                    <span>Payment Status</span>
-                                    <span>{order.isPaid ? 'Paid' : 'Pending'}</span>
+                                <div className="flex items-center gap-3 text-[#8B5E34]">
+                                    <FiCheck className="w-5 h-5" />
+                                    <span>Payment Status: {order.isPaid ? 'Paid' : 'Pending'}</span>
                                 </div>
                                 {order.isPaid && (
-                                    <div className="flex justify-between text-[#8B5E34]">
-                                        <span>Paid At</span>
-                                        <span>{new Date(order.paidAt).toLocaleDateString('en-US', {
+                                    <div className="flex items-center gap-3 text-[#8B5E34]">
+                                        <FiCalendar className="w-5 h-5" />
+                                        <span>Paid on {new Date(order.paidAt).toLocaleDateString('en-US', {
                                             year: 'numeric',
                                             month: 'long',
-                                            day: 'numeric'
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
                                         })}</span>
                                     </div>
                                 )}
@@ -234,9 +296,11 @@ const OrderDetails = () => {
 
                         <div className="bg-white rounded-xl p-8 border border-[#C4A484]/10">
                             <h2 className="text-xl font-medium text-gray-900 mb-6">Order Timeline</h2>
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 <div className="flex items-center gap-3">
-                                    <FiClock className="w-5 h-5 text-[#8B5E34]" />
+                                    <div className="w-8 h-8 rounded-full bg-[#C4A484] flex items-center justify-center">
+                                        <FiClock className="w-4 h-4 text-white" />
+                                    </div>
                                     <div>
                                         <p className="font-medium text-gray-900">Order Placed</p>
                                         <p className="text-sm text-[#8B5E34]">{new Date(order.createdAt).toLocaleDateString('en-US', {
@@ -248,11 +312,26 @@ const OrderDetails = () => {
                                         })}</p>
                                     </div>
                                 </div>
+
+                                {order.status === 'shipped' && (
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                                            <FiTruck className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-gray-900">Order Shipped</p>
+                                            <p className="text-sm text-[#8B5E34]">Your order is on its way</p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {order.isDelivered && (
                                     <div className="flex items-center gap-3">
-                                        <FiPackage className="w-5 h-5 text-[#8B5E34]" />
+                                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                                            <FiPackage className="w-4 h-4 text-white" />
+                                        </div>
                                         <div>
-                                            <p className="font-medium text-gray-900">Delivered</p>
+                                            <p className="font-medium text-gray-900">Order Delivered</p>
                                             <p className="text-sm text-[#8B5E34]">{new Date(order.deliveredAt).toLocaleDateString('en-US', {
                                                 year: 'numeric',
                                                 month: 'long',

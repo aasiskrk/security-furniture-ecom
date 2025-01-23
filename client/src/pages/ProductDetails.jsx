@@ -8,6 +8,12 @@ import Cookies from 'js-cookie';
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 const CART_COOKIE_KEY = 'furniture_cart';
 
+const getStockStatus = (countInStock) => {
+    if (countInStock === 0) return { label: 'Out of Stock', className: 'text-red-500' };
+    if (countInStock <= 10) return { label: `Only ${countInStock} left in stock`, className: 'text-yellow-500' };
+    return { label: 'In Stock', className: 'text-green-500' };
+};
+
 const ProductDetails = () => {
     const { id } = useParams();
     const location = useLocation();
@@ -57,6 +63,12 @@ const ProductDetails = () => {
         try {
             if (!selectedColor) {
                 toast.error('Please select a color');
+                return;
+            }
+
+            // Check if product is out of stock
+            if (product.countInStock === 0) {
+                toast.error('This product is out of stock');
                 return;
             }
 
@@ -217,11 +229,12 @@ const ProductDetails = () => {
                 <div className="lg:w-1/2">
                     {/* Status and Rating */}
                     <div className="flex items-center justify-between mb-6">
-                        {product.countInStock > 0 ? (
-                            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">In Stock</span>
-                        ) : (
-                            <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Out of Stock</span>
-                        )}
+                        <div className="mb-6">
+                            <h3 className="text-sm font-medium text-gray-900 mb-2">Availability</h3>
+                            <p className={`text-sm ${getStockStatus(product.countInStock).className}`}>
+                                {getStockStatus(product.countInStock).label}
+                            </p>
+                        </div>
                     </div>
 
                     {/* Product Title and Description */}

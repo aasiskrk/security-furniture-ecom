@@ -32,16 +32,61 @@ const AdminOrders = () => {
         fetchOrders();
     }, []);
 
+    // Separate unpaid delivered orders
+    const unpaidDeliveredOrders = orders.filter(order => {
+        // Apply search filter if exists
+        if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            const matchesSearch =
+                order._id.toLowerCase().includes(searchLower) ||
+                order.user.name.toLowerCase().includes(searchLower) ||
+                order.user.email.toLowerCase().includes(searchLower) ||
+                order.orderItems.some(item => item.name.toLowerCase().includes(searchLower));
+            if (!matchesSearch) return false;
+        }
+
+        // Apply payment method filter if selected
+        if (paymentFilter !== 'all') {
+            const paymentMethod = paymentFilter === 'cod' ? 'COD' : 'eSewa';
+            if (order.paymentMethod !== paymentMethod) return false;
+        }
+
+        // Only show delivered but unpaid orders
+        return order.status === 'Delivered' && !order.isPaid;
+    });
+
     // Filter orders based on active tab and filters
     const filteredOrders = orders.filter(order => {
-        // Filter by active/past tab
+        // Apply search filter
+        if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            const matchesSearch =
+                order._id.toLowerCase().includes(searchLower) ||
+                order.user.name.toLowerCase().includes(searchLower) ||
+                order.user.email.toLowerCase().includes(searchLower) ||
+                order.orderItems.some(item => item.name.toLowerCase().includes(searchLower));
+            if (!matchesSearch) return false;
+        }
+
+        // Apply payment method filter
+        if (paymentFilter !== 'all') {
+            const paymentMethod = paymentFilter === 'cod' ? 'COD' : 'eSewa';
+            if (order.paymentMethod !== paymentMethod) return false;
+        }
+
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            if (order.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+        }
+
+        // Filter based on active/past tab
         if (activeTab === 'active') {
             // For active tab:
-            // 1. Include orders that are not delivered
-            // 2. Exclude cancelled orders
-            // 3. Exclude delivered orders (since they're shown in the top table if unpaid)
+            // 1. Exclude cancelled orders
+            // 2. Exclude delivered orders that are paid
+            // 3. Show orders that are in progress (not delivered)
             if (order.status === 'Cancelled') return false;
-            if (order.status === 'Delivered') return false;
+            if (order.status === 'Delivered' && order.isPaid) return false;
             return true;
         } else {
             // For past tab:
@@ -50,30 +95,6 @@ const AdminOrders = () => {
             // 2. Delivered AND Paid
             return order.status === 'Cancelled' || (order.status === 'Delivered' && order.isPaid);
         }
-
-        // Filter by payment method
-        if (paymentFilter !== 'all') {
-            if (paymentFilter === 'cod' && order.paymentMethod !== 'COD') return false;
-            if (paymentFilter === 'esewa' && order.paymentMethod !== 'eSewa') return false;
-        }
-
-        // Filter by status
-        if (statusFilter !== 'all' && order.status.toLowerCase() !== statusFilter) {
-            return false;
-        }
-
-        // Search filter
-        if (searchQuery) {
-            const searchLower = searchQuery.toLowerCase();
-            return (
-                order._id.toLowerCase().includes(searchLower) ||
-                order.user.name.toLowerCase().includes(searchLower) ||
-                order.user.email.toLowerCase().includes(searchLower) ||
-                order.orderItems.some(item => item.name.toLowerCase().includes(searchLower))
-            );
-        }
-
-        return true;
     });
 
     const getStatusColor = (status) => {
@@ -362,11 +383,6 @@ const AdminOrders = () => {
             </AdminLayout>
         );
     }
-
-    // Separate unpaid delivered orders
-    const unpaidDeliveredOrders = orders.filter(order =>
-        order.status === 'Delivered' && !order.isPaid
-    );
 
     return (
         <AdminLayout>

@@ -48,7 +48,7 @@ Api.interceptors.response.use(
 export const registerApi = (data) => Api.post("/auth/register", data);
 export const loginApi = (data) => Api.post("/auth/login", data);
 export const getCurrentUserApi = () => Api.get("/auth/me");
-export const updateProfileApi = (data) => Api.put("/auth/update-profile", data);
+export const updateProfileApi = (data) => Api.put("/auth/profile", data);
 export const changePasswordApi = (data) =>
   Api.put("/auth/change-password", data);
 export const forgotPasswordApi = (data) =>
@@ -129,7 +129,14 @@ export const updatePaymentStatusApi = async (orderId, data) => {
   return Api.put(`/orders/${orderId}/payment`, data);
 };
 
-export const cancelOrderApi = (id) => Api.put(`/orders/${id}/cancel`);
+export const cancelOrderApi = async (orderId) => {
+  try {
+    const response = await Api.put(`/orders/${orderId}/cancel`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Admin APIs
 export const getAdminDashboardStatsApi = () => Api.get("/admin/dashboard");
@@ -141,6 +148,11 @@ export const getAdminUsersApi = () => Api.get("/admin/users");
 
 export const updateUserStatusApi = (userId, status) =>
   Api.put(`/admin/users/${userId}/status`, { status });
+
+export const updateUserRoleApi = (userId, role) =>
+  Api.put(`/admin/users/${userId}/role`, { role });
+
+export const deleteUserApi = (userId) => Api.delete(`/admin/users/${userId}`);
 
 // Review APIs
 export const createReviewApi = (productId, data) =>
@@ -198,5 +210,8 @@ export const deleteAddressApi = async (addressId) => {
 export const setDefaultAddressApi = async (addressId) => {
   return Api.put(`/auth/address/${addressId}/default`);
 };
+
+// User APIs
+export const createUserApi = (userData) => Api.post("/admin/users", userData);
 
 export default Api;

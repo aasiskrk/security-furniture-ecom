@@ -1,12 +1,16 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiArrowRight, FiShoppingBag, FiGrid, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
+import { getAllProductsApi, getProductCategoriesApi } from '../api/apis.js';
+import { toast } from 'react-hot-toast';
 
 const Home = () => {
+    const navigate = useNavigate();
     const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState(0);
@@ -49,6 +53,35 @@ const Home = () => {
             description: 'Create your perfect sanctuary'
         }
     ];
+
+    // Fetch products and categories
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [productsResponse, categoriesResponse] = await Promise.all([
+                    getAllProductsApi(),
+                    getProductCategoriesApi()
+                ]);
+                
+                setProducts(productsResponse.data.products || []);
+                setCategories(categoriesResponse.data || []);
+            } catch (error) {
+                toast.error('Failed to fetch data');
+                setProducts([]);
+                setCategories([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Handle category click
+    const handleCategoryClick = (categoryName) => {
+        navigate(`/shop?category=${categoryName}`);
+    };
 
     useEffect(() => {
         document.documentElement.style.scrollBehavior = 'smooth';
@@ -176,7 +209,7 @@ const Home = () => {
     ];
 
     // Categories from backend
-    const categories = [
+    const backendCategories = [
         {
             name: "Living Room",
             image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7",
@@ -332,23 +365,7 @@ const Home = () => {
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
                                         >
-                                            <Link
-                                                to="/categories"
-                                                className="relative inline-flex items-center group"
-                                            >
-                                                <span className="relative flex items-center text-white hover:text-[#C4A484] transition-colors duration-300 font-medium text-sm">
-                                                    <FiGrid className="w-4 h-4 mr-2 transition-transform duration-300 group-hover:rotate-12" />
-                                                    View Categories
-                                                    <motion.div
-                                                        className="ml-2"
-                                                        initial={{ x: 0 }}
-                                                        whileHover={{ x: 4 }}
-                                                        transition={{ duration: 0.2 }}
-                                                    >
-                                                        <FiArrowRight className="w-4 h-4" />
-                                                    </motion.div>
-                                                </span>
-                                            </Link>
+                                            
                                         </motion.div>
                                     </motion.div>
                                 </motion.div>
@@ -414,37 +431,61 @@ const Home = () => {
                     <div className="relative px-4">
                         <div className="embla overflow-hidden" ref={emblaRef}>
                             <div className="embla__container flex">
-                                {categories.map((category, index) => (
-                                    <div key={category.name} className="embla__slide flex-[0_0_33.33%] min-w-0 pl-8 first:pl-0">
+                                {(categories.length > 0 ? categories : backendCategories).map((category, index) => (
+                                    <div 
+                                        key={category._id || category.name} 
+                                        className="embla__slide flex-[0_0_33.33%] min-w-0 pl-8 first:pl-0"
+                                    >
                                         <motion.div
                                             className="relative group"
                                             initial={{ opacity: 0, y: 20 }}
                                             whileInView={{ opacity: 1, y: 0 }}
                                             transition={{ duration: animationConfig.duration, delay: index * 0.1 }}
                                             whileHover={{ scale: 1.02 }}
+                                            onClick={() => handleCategoryClick(category._id || category.name)}
                                         >
-                                            <Link to={`/category/${category.name.toLowerCase()}`}>
-                                                <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg">
-                                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-300"></div>
-                                                    <img
-                                                        src={category.image}
-                                                        alt={category.name}
-                                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                    />
-                                                    <div className="absolute inset-0 flex flex-col justify-end p-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-                                                        <h3 className="text-2xl font-serif font-bold text-white mb-2">
-                                                            {category.name}
+                                            <div className="relative h-[400px] rounded-xl overflow-hidden shadow-lg cursor-pointer bg-gradient-to-br from-[#C4A484]/10 to-[#C4A484]/5 border border-[#C4A484]/20 backdrop-blur-sm">
+                                                {/* Decorative Elements */}
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-[#C4A484]/5 rounded-full -translate-y-16 translate-x-16"></div>
+                                                <div className="absolute bottom-0 left-0 w-40 h-40 bg-[#C4A484]/5 rounded-full translate-y-20 -translate-x-20"></div>
+                                                
+                                                {/* Content */}
+                                                <div className="absolute inset-0 p-8 flex flex-col justify-between">
+                                                    <div>
+                                                        <div className="w-16 h-16 rounded-2xl bg-[#C4A484]/10 flex items-center justify-center mb-6">
+                                                            <FiGrid className="w-8 h-8 text-[#C4A484]" />
+                                                        </div>
+                                                        <h3 className="text-2xl font-serif font-bold text-gray-900 mb-3">
+                                                            {category._id || category.name}
                                                         </h3>
-                                                        <p className="text-white/90 mb-4">
-                                                            {category.description}
+                                                        <p className="text-gray-600 mb-4">
+                                                            {category.subcategories ? 
+                                                                `${category.subcategories.length} ${category.subcategories.length === 1 ? 'item' : 'items'}` :
+                                                                category.description
+                                                            }
                                                         </p>
-                                                        <div className="flex items-center text-[#C4A484] font-medium text-sm group-hover:text-white transition-colors duration-300">
+                                                    </div>
+                                                    
+                                                    {/* Bottom Section */}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center text-[#C4A484] font-medium group-hover:text-[#B39374] transition-colors duration-300">
                                                             <span>Explore Collection</span>
                                                             <FiArrowRight className="ml-2 w-4 h-4 transition-transform duration-300 group-hover:translate-x-2" />
                                                         </div>
+                                                        
+                                                        {/* Decorative Pattern */}
+                                                        <div className="flex gap-1">
+                                                            {[...Array(3)].map((_, i) => (
+                                                                <div 
+                                                                    key={i} 
+                                                                    className="w-1.5 h-1.5 rounded-full bg-[#C4A484]/30 group-hover:bg-[#C4A484] transition-colors duration-300"
+                                                                    style={{ transitionDelay: `${i * 50}ms` }}
+                                                                ></div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </Link>
+                                            </div>
                                         </motion.div>
                                     </div>
                                 ))}
@@ -515,47 +556,70 @@ const Home = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {featuredProducts.map((product) => (
-                            <motion.div
-                                key={product._id}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                transition={{ duration: animationConfig.duration }}
-                                whileHover={{ y: -4 }}
-                                className="group h-full"
-                            >
-                                <Link to={`/product/${product._id}`} className="block h-full">
-                                    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 h-full flex flex-col">
-                                        <div className="relative aspect-square overflow-hidden">
-                                            <img
-                                                src={product.image}
-                                                alt={product.name}
-                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                loading="lazy"
-                                            />
-                                            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-200"></div>
-                                        </div>
-                                        <div className="p-5 flex flex-col flex-grow">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium text-[#C4A484]">{product.category}</span>
-                                                <div
-                                                    className="w-3 h-3 rounded-full border border-white shadow-sm"
-                                                    style={{ backgroundColor: product.colors[0].code }}
-                                                    title={product.colors[0].name}
-                                                ></div>
-                                            </div>
-                                            <h3 className="text-lg font-serif font-bold text-gray-900 mb-2 line-clamp-1">{product.name}</h3>
-                                            <div className="flex items-center justify-between mt-auto">
-                                                <p className="text-gray-600 text-sm line-clamp-1">{product.material}</p>
-                                                <p className="font-medium text-gray-900 whitespace-nowrap">
-                                                    Rp {product.price.toLocaleString()}
-                                                </p>
-                                            </div>
+                        {loading ? (
+                            // Loading skeletons
+                            [...Array(8)].map((_, index) => (
+                                <div key={index} className="bg-white rounded-lg overflow-hidden shadow-sm">
+                                    <div className="aspect-square bg-gray-200 animate-pulse"></div>
+                                    <div className="p-5 space-y-3">
+                                        <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
+                                        <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                                        <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                                        <div className="flex justify-between items-center">
+                                            <div className="h-4 bg-gray-200 rounded animate-pulse w-1/3"></div>
+                                            <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
                                         </div>
                                     </div>
-                                </Link>
-                            </motion.div>
-                        ))}
+                                </div>
+                            ))
+                        ) : (
+                            products.slice(0, 8).map((product) => (
+                                <motion.div
+                                    key={product._id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: animationConfig.duration }}
+                                    whileHover={{ y: -4 }}
+                                    className="group h-full"
+                                >
+                                    <Link to={`/product/${product._id}`} className="block h-full">
+                                        <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 h-full flex flex-col">
+                                            <div className="relative aspect-square overflow-hidden">
+                                                <img
+                                                    src={`http://localhost:5000${product.pictures[0]}`}
+                                                    alt={product.name}
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                    loading="lazy"
+                                                />
+                                                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-200"></div>
+                                            </div>
+                                            <div className="p-5 flex flex-col flex-grow">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-sm font-medium text-[#C4A484]">{product.category}</span>
+                                                    <div className="flex -space-x-1">
+                                                        {product.colors.map((color, index) => (
+                                                            <div
+                                                                key={index}
+                                                                className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                                                style={{ backgroundColor: color.code }}
+                                                                title={color.name}
+                                                            ></div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <h3 className="text-lg font-serif font-bold text-gray-900 mb-2 line-clamp-1">{product.name}</h3>
+                                                <div className="flex items-center justify-between mt-auto">
+                                                    <p className="text-gray-600 text-sm line-clamp-1">{product.material}</p>
+                                                    <p className="font-medium text-gray-900 whitespace-nowrap">
+                                                        Rp {product.price.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </motion.div>
+                            ))
+                        )}
                     </div>
 
                     <div className="text-center mt-12">

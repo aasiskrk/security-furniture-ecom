@@ -578,29 +578,86 @@ const DeleteConfirmDialog = ({ isOpen, onClose, onConfirm, productName }) => {
     );
 };
 
+// Add this helper function at the top level
+const getStockStatus = (countInStock) => {
+    if (countInStock === 0) return { label: 'Out of Stock', className: 'bg-red-100 text-red-800' };
+    if (countInStock <= 10) return { label: 'Low Stock', className: 'bg-yellow-100 text-yellow-800' };
+    return { label: 'In Stock', className: 'bg-green-100 text-green-800' };
+};
+
 const Products = () => {
     const [products, setProducts] = useState([]);
+    const [filteredProducts, setFilteredProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
 
+    // Filter states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+
     useEffect(() => {
         fetchProducts();
     }, []);
+
+    // Add effect for filtering products
+    useEffect(() => {
+        filterProducts();
+    }, [products, searchQuery, categoryFilter, statusFilter]);
 
     const fetchProducts = async () => {
         try {
             setIsLoading(true);
             const response = await getAllProductsApi();
-            setProducts(response.data.products || []);
+            const fetchedProducts = response.data.products || [];
+            setProducts(fetchedProducts);
+            setFilteredProducts(fetchedProducts);
         } catch (error) {
             toast.error('Failed to fetch products');
             setProducts([]);
+            setFilteredProducts([]);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const filterProducts = () => {
+        let filtered = [...products];
+
+        // Apply search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(product =>
+                product.name.toLowerCase().includes(query) ||
+                product.description.toLowerCase().includes(query) ||
+                product.category.toLowerCase().includes(query)
+            );
+        }
+
+        // Apply category filter
+        if (categoryFilter) {
+            filtered = filtered.filter(product => product.category === categoryFilter);
+        }
+
+        // Update status filter to handle all three states
+        if (statusFilter) {
+            switch (statusFilter) {
+                case 'in_stock':
+                    filtered = filtered.filter(product => product.countInStock > 10);
+                    break;
+                case 'low_stock':
+                    filtered = filtered.filter(product => product.countInStock > 0 && product.countInStock <= 10);
+                    break;
+                case 'out_of_stock':
+                    filtered = filtered.filter(product => product.countInStock === 0);
+                    break;
+            }
+        }
+
+        setFilteredProducts(filtered);
     };
 
     const handleDelete = async () => {
@@ -650,20 +707,37 @@ const Products = () => {
                             <input
                                 type="text"
                                 placeholder="Search products..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white"
                             />
                         </div>
                         <div className="flex items-center gap-4">
-                            <select className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white">
+                            <select
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white"
+                            >
                                 <option value="">All Categories</option>
-                                <option value="living-room">Living Room</option>
-                                <option value="bedroom">Bedroom</option>
-                                <option value="dining-room">Dining Room</option>
+                                <option value="Living Room">Living Room</option>
+                                <option value="Bedroom">Bedroom</option>
+                                <option value="Dining Room">Dining Room</option>
+                                <option value="Kitchen">Kitchen</option>
+                                <option value="Office">Office</option>
+                                <option value="Outdoor">Outdoor</option>
+                                <option value="Kids">Kids</option>
+                                <option value="Storage">Storage</option>
+                                <option value="Other">Other</option>
                             </select>
-                            <select className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white"
+                            >
                                 <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
+                                <option value="in_stock">In Stock</option>
+                                <option value="low_stock">Low Stock</option>
+                                <option value="out_of_stock">Out of Stock</option>
                             </select>
                         </div>
                     </div>
@@ -690,79 +764,76 @@ const Products = () => {
                                         Loading products...
                                     </td>
                                 </tr>
-                            ) : products.length === 0 ? (
+                            ) : filteredProducts.length === 0 ? (
                                 <tr>
                                     <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                                         No products found
                                     </td>
                                 </tr>
                             ) : (
-                                products.map((product) => (
-                                <tr key={product._id} className="hover:bg-[#F8F5F1]/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center">
-                                            <div className="h-16 w-16 flex-shrink-0">
-                                                <img
-                                                    className="h-16 w-16 rounded-lg object-cover border border-[#C4A484]/10"
+                                filteredProducts.map((product) => (
+                                    <tr key={product._id} className="hover:bg-[#F8F5F1]/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center">
+                                                <div className="h-16 w-16 flex-shrink-0">
+                                                    <img
+                                                        className="h-16 w-16 rounded-lg object-cover border border-[#C4A484]/10"
                                                         src={`http://localhost:5000${product.pictures[0]}`}
-                                                    alt={product.name}
-                                                />
+                                                        alt={product.name}
+                                                    />
+                                                </div>
+                                                <div className="ml-4">
+                                                    <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                                    <div className="text-sm text-gray-500 line-clamp-1">{product.description}</div>
+                                                </div>
                                             </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                                <div className="text-sm text-gray-500 line-clamp-1">{product.description}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-900">{product.category}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-gray-900">{product.category}</div>
                                             <div className="text-sm text-gray-500">{product.subCategory}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
-                                        Rp {product.price.toLocaleString()}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                            <span className={`inline-flex text-sm ${product.countInStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                            Rp {product.price.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex text-sm ${product.countInStock > 0 ? (product.countInStock <= 10 ? 'text-yellow-600' : 'text-green-600') : 'text-red-600'}`}>
                                                 {product.countInStock} units
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex -space-x-1">
-                                            {product.colors.map((color, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="w-6 h-6 rounded-full border-2 border-white ring-2 ring-[#C4A484]/10"
-                                                    style={{ backgroundColor: color.code }}
-                                                    title={color.name}
-                                                />
-                                            ))}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${product.countInStock > 0
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {product.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center space-x-3">
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex -space-x-1">
+                                                {product.colors.map((color, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="w-6 h-6 rounded-full border-2 border-white ring-2 ring-[#C4A484]/10"
+                                                        style={{ backgroundColor: color.code }}
+                                                        title={color.name}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStockStatus(product.countInStock).className}`}>
+                                                {getStockStatus(product.countInStock).label}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center space-x-3">
                                                 <button
                                                     onClick={() => handleEdit(product)}
                                                     className="text-[#C4A484] hover:text-[#8B5E34] transition-colors"
                                                 >
-                                                <FiEdit2 className="w-5 h-5" />
-                                            </button>
+                                                    <FiEdit2 className="w-5 h-5" />
+                                                </button>
                                                 <button
                                                     onClick={() => handleDeleteClick(product)}
                                                     className="text-red-400 hover:text-red-600 transition-colors"
                                                 >
-                                                <FiTrash2 className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                                    <FiTrash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 ))
                             )}
                         </tbody>
@@ -772,7 +843,7 @@ const Products = () => {
                     <div className="bg-[#F8F5F1]/50 px-6 py-4 border-t border-[#C4A484]/10">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-600">
-                                {!isLoading && `Showing 1 to ${products.length} of ${products.length} products`}
+                                {!isLoading && `Showing 1 to ${filteredProducts.length} of ${filteredProducts.length} products`}
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button className="px-4 py-2 border border-[#C4A484]/20 rounded-lg text-sm text-gray-600 hover:bg-[#C4A484]/10 transition-colors">

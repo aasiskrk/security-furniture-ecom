@@ -21,6 +21,16 @@ const Checkout = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const location = useLocation();
 
+    // Add the missing addressForm state
+    const [addressForm, setAddressForm] = useState({
+        fullName: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pinCode: ''
+    });
+
     // Check for payment error message
     useEffect(() => {
         const paymentError = sessionStorage.getItem('paymentError');
@@ -119,15 +129,47 @@ const Checkout = () => {
 
     const handleAddressSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate all fields are filled
+        const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pinCode'];
+        const emptyFields = requiredFields.filter(field => !addressForm[field].trim());
+
+        if (emptyFields.length > 0) {
+            toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`);
+            return;
+        }
+
+        // Validate phone number format (basic validation)
+        const phoneRegex = /^\d{10,12}$/;
+        if (!phoneRegex.test(addressForm.phone.replace(/[-\s]/g, ''))) {
+            toast.error('Please enter a valid phone number (10-12 digits)');
+            return;
+        }
+
+        // Validate PIN code (basic validation)
+        const pinCodeRegex = /^\d{5,6}$/;
+        if (!pinCodeRegex.test(addressForm.pinCode.replace(/\s/g, ''))) {
+            toast.error('Please enter a valid PIN code (5-6 digits)');
+            return;
+        }
+
         try {
             const response = await addAddressApi(addressForm);
             setAddresses(response.data.addresses);
             setSelectedAddress(response.data.addresses[response.data.addresses.length - 1]);
             setShowAddressForm(false);
+            setAddressForm({
+                fullName: '',
+                phone: '',
+                address: '',
+                city: '',
+                state: '',
+                pinCode: ''
+            });
             toast.success('Address added successfully');
         } catch (error) {
             console.error('Error adding address:', error);
-            toast.error('Failed to add address');
+            toast.error(error.response?.data?.message || 'Failed to add address');
         }
     };
 
@@ -274,188 +316,234 @@ const Checkout = () => {
 
                         {/* Address Section */}
                         <div className="bg-white p-6 rounded-xl border border-[#C4A484]/10">
-                            <h2 className="text-xl font-serif font-bold text-gray-900 mb-6">Shipping & Billing Address</h2>
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-serif font-bold text-gray-900">Shipping & Billing Address</h2>
+                                {!showAddressForm && (
+                                    <button
+                                        onClick={() => {
+                                            setShowAddressForm(true);
+                                            setSelectedAddress(null);
+                                        }}
+                                        className="flex items-center space-x-2 text-[#C4A484] hover:text-[#8B5E34] transition-colors"
+                                    >
+                                        <FiPlus className="w-5 h-5" />
+                                        <span>Add New Address</span>
+                                    </button>
+                                )}
+                            </div>
 
-                            {addresses.length > 0 && !showAddressForm && !selectedAddress && (
-                                <div className="mb-6 space-y-4">
+                            {/* Address List */}
+                            {!showAddressForm && addresses.length > 0 && (
+                                <div className="grid grid-cols-1 gap-4 mb-6">
                                     {addresses.map(address => (
-                                        <div key={address._id} className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
+                                        <div
+                                            key={address._id}
+                                            className={`border rounded-xl p-4 cursor-pointer transition-all ${selectedAddress?._id === address._id
+                                                ? 'border-[#C4A484] bg-[#F8F5F1] shadow-sm'
+                                                : 'border-[#C4A484]/10 hover:border-[#C4A484]/30 hover:bg-[#F8F5F1]/50'
+                                                }`}
+                                            onClick={() => handleSelectAddress(address)}
+                                        >
                                             <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-medium text-gray-900">{address.fullName}</p>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center space-x-3">
+                                                        <p className="font-medium text-gray-900">{address.fullName}</p>
+                                                        {address.isDefault && (
+                                                            <span className="px-2 py-1 bg-[#C4A484]/10 text-[#8B5E34] text-xs rounded-full">
+                                                                Default
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-[#8B5E34] mt-1">{address.phone}</p>
                                                     <p className="text-[#8B5E34]">{address.address}</p>
                                                     <p className="text-[#8B5E34]">{address.city}, {address.state} {address.pinCode}</p>
                                                 </div>
-                                                <button
-                                                    onClick={() => handleSelectAddress(address)}
-                                                    className="text-[#C4A484] hover:text-[#8B5E34] transition-colors text-sm font-medium"
-                                                >
-                                                    {address.isDefault ? 'Selected' : 'Select'}
-                                                </button>
+                                                <div className="flex items-center space-x-2">
+                                                    {selectedAddress?._id === address._id ? (
+                                                        <div className="w-6 h-6 rounded-full border-2 border-[#C4A484] flex items-center justify-center">
+                                                            <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
 
-                            {!showAddressForm && !selectedAddress && (
-                                <button
-                                    onClick={() => setShowAddressForm(true)}
-                                    className="flex items-center space-x-2 text-[#C4A484] hover:text-[#8B5E34] transition-colors"
-                                >
-                                    <FiPlus className="w-5 h-5" />
-                                    <span>Add new address</span>
-                                </button>
+                            {/* No Addresses Message */}
+                            {!showAddressForm && addresses.length === 0 && (
+                                <div className="text-center py-8">
+                                    <p className="text-[#8B5E34] mb-4">You haven't added any addresses yet</p>
+                                    <button
+                                        onClick={() => setShowAddressForm(true)}
+                                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#C4A484] hover:bg-[#B39374] transition-colors"
+                                    >
+                                        <FiPlus className="w-5 h-5 mr-2" />
+                                        Add Your First Address
+                                    </button>
+                                </div>
                             )}
 
+                            {/* Address Form */}
                             {showAddressForm && (
-                                <form onSubmit={handleAddressSubmit} className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                                            <input
-                                                type="text"
-                                                name="fullName"
-                                                value={addressForm.fullName}
-                                                onChange={handleAddressChange}
-                                                required
-                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">Phone</label>
-                                            <input
-                                                type="tel"
-                                                name="phone"
-                                                value={addressForm.phone}
-                                                onChange={handleAddressChange}
-                                                required
-                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Address</label>
-                                        <input
-                                            type="text"
-                                            name="address"
-                                            value={addressForm.address}
-                                            onChange={handleAddressChange}
-                                            required
-                                            className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">City</label>
-                                            <input
-                                                type="text"
-                                                name="city"
-                                                value={addressForm.city}
-                                                onChange={handleAddressChange}
-                                                required
-                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">State</label>
-                                            <input
-                                                type="text"
-                                                name="state"
-                                                value={addressForm.state}
-                                                onChange={handleAddressChange}
-                                                required
-                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700">PIN Code</label>
-                                            <input
-                                                type="text"
-                                                name="pinCode"
-                                                value={addressForm.pinCode}
-                                                onChange={handleAddressChange}
-                                                required
-                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end space-x-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAddressForm(false)}
-                                            className="px-4 py-2 border border-[#C4A484]/20 rounded-lg text-sm font-medium text-[#8B5E34] hover:bg-[#F8F5F1] transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#C4A484] hover:bg-[#B39374] transition-colors"
-                                        >
-                                            Save Address
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-
-                            {selectedAddress && (
                                 <div>
-                                    <div className="border border-[#C4A484]/10 rounded-xl p-4 mb-4 hover:bg-[#F8F5F1]/50 transition-colors">
-                                        <div className="flex justify-between items-start">
+                                    <div className="flex items-center space-x-2 mb-6">
+                                        <button
+                                            onClick={() => {
+                                                setShowAddressForm(false);
+                                                if (addresses.length > 0) {
+                                                    const defaultAddr = addresses.find(addr => addr.isDefault);
+                                                    setSelectedAddress(defaultAddr || addresses[0]);
+                                                }
+                                            }}
+                                            className="text-[#8B5E34] hover:text-[#C4A484] transition-colors"
+                                        >
+                                            ← Back to addresses
+                                        </button>
+                                    </div>
+                                    <form onSubmit={handleAddressSubmit} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <p className="font-medium text-gray-900">{selectedAddress.fullName}</p>
-                                                <p className="text-[#8B5E34] mt-1">{selectedAddress.phone}</p>
-                                                <p className="text-[#8B5E34]">{selectedAddress.address}</p>
-                                                <p className="text-[#8B5E34]">{selectedAddress.city}, {selectedAddress.state} {selectedAddress.pinCode}</p>
+                                                <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                                                <input
+                                                    type="text"
+                                                    name="fullName"
+                                                    value={addressForm.fullName}
+                                                    onChange={handleAddressChange}
+                                                    required
+                                                    className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                />
                                             </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                                                <input
+                                                    type="tel"
+                                                    name="phone"
+                                                    value={addressForm.phone}
+                                                    onChange={handleAddressChange}
+                                                    required
+                                                    className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                    placeholder="10-12 digits"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Address</label>
+                                            <input
+                                                type="text"
+                                                name="address"
+                                                value={addressForm.address}
+                                                onChange={handleAddressChange}
+                                                required
+                                                className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                placeholder="Street address, apartment, etc."
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">City</label>
+                                                <input
+                                                    type="text"
+                                                    name="city"
+                                                    value={addressForm.city}
+                                                    onChange={handleAddressChange}
+                                                    required
+                                                    className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">State</label>
+                                                <input
+                                                    type="text"
+                                                    name="state"
+                                                    value={addressForm.state}
+                                                    onChange={handleAddressChange}
+                                                    required
+                                                    className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">PIN Code</label>
+                                                <input
+                                                    type="text"
+                                                    name="pinCode"
+                                                    value={addressForm.pinCode}
+                                                    onChange={handleAddressChange}
+                                                    required
+                                                    className="mt-1 block w-full border border-[#C4A484]/20 rounded-lg shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C4A484] focus:border-[#C4A484]"
+                                                    placeholder="5-6 digits"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end space-x-4">
                                             <button
+                                                type="button"
                                                 onClick={() => {
-                                                    setSelectedAddress(null);
-                                                    setShowAddressForm(true);
+                                                    setShowAddressForm(false);
+                                                    if (addresses.length > 0) {
+                                                        const defaultAddr = addresses.find(addr => addr.isDefault);
+                                                        setSelectedAddress(defaultAddr || addresses[0]);
+                                                    }
                                                 }}
-                                                className="text-[#C4A484] hover:text-[#8B5E34] transition-colors text-sm font-medium"
+                                                className="px-4 py-2 border border-[#C4A484]/20 rounded-lg text-sm font-medium text-[#8B5E34] hover:bg-[#F8F5F1] transition-colors"
                                             >
-                                                Change
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#C4A484] hover:bg-[#B39374] transition-colors"
+                                            >
+                                                Save Address
                                             </button>
                                         </div>
-                                    </div>
-
-                                    {/* Payment Section */}
-                                    <div className="mt-8">
-                                        <h3 className="text-xl font-serif font-bold text-gray-900 mb-4">Payment Method</h3>
-                                        <div className="space-y-4">
-                                            <div className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
-                                                <label className="flex items-center">
-                                                    <input
-                                                        type="radio"
-                                                        name="payment"
-                                                        value="COD"
-                                                        checked={paymentMethod === 'COD'}
-                                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                                        className="h-4 w-4 text-[#C4A484] focus:ring-[#C4A484]"
-                                                    />
-                                                    <span className="ml-3 text-gray-900">Cash on Delivery (COD)</span>
-                                                </label>
-                                            </div>
-                                            <div className="border border-[#C4A484]/10 rounded-xl p-4 hover:bg-[#F8F5F1]/50 transition-colors">
-                                                <label className="flex items-center">
-                                                    <input
-                                                        type="radio"
-                                                        name="payment"
-                                                        value="eSewa"
-                                                        checked={paymentMethod === 'eSewa'}
-                                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                                        className="h-4 w-4 text-[#C4A484] focus:ring-[#C4A484]"
-                                                    />
-                                                    <span className="ml-3 text-gray-900">eSewa</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    </form>
                                 </div>
                             )}
                         </div>
+
+                        {/* Payment Section - Only show when address is selected */}
+                        {selectedAddress && !showAddressForm && (
+                            <div className="mt-8 bg-white p-6 rounded-xl border border-[#C4A484]/10">
+                                <h3 className="text-xl font-serif font-bold text-gray-900 mb-4">Payment Method</h3>
+                                <div className="space-y-4">
+                                    <div
+                                        className={`border rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'COD'
+                                                ? 'border-[#C4A484] bg-[#F8F5F1] shadow-sm'
+                                                : 'border-[#C4A484]/10 hover:border-[#C4A484]/30 hover:bg-[#F8F5F1]/50'
+                                            }`}
+                                        onClick={() => setPaymentMethod('COD')}
+                                    >
+                                        <label className="flex items-center cursor-pointer">
+                                            <div className="w-6 h-6 rounded-full border-2 border-[#C4A484] flex items-center justify-center mr-3">
+                                                {paymentMethod === 'COD' && (
+                                                    <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
+                                                )}
+                                            </div>
+                                            <span className="text-gray-900">Cash on Delivery (COD)</span>
+                                        </label>
+                                    </div>
+                                    <div
+                                        className={`border rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'eSewa'
+                                                ? 'border-[#C4A484] bg-[#F8F5F1] shadow-sm'
+                                                : 'border-[#C4A484]/10 hover:border-[#C4A484]/30 hover:bg-[#F8F5F1]/50'
+                                            }`}
+                                        onClick={() => setPaymentMethod('eSewa')}
+                                    >
+                                        <label className="flex items-center cursor-pointer">
+                                            <div className="w-6 h-6 rounded-full border-2 border-[#C4A484] flex items-center justify-center mr-3">
+                                                {paymentMethod === 'eSewa' && (
+                                                    <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
+                                                )}
+                                            </div>
+                                            <span className="text-gray-900">eSewa</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Right Column - Order Summary */}

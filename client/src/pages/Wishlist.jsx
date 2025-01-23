@@ -6,6 +6,13 @@ import Cookies from 'js-cookie';
 import { getProductByIdApi } from '../api/apis.js';
 
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
+const CART_COOKIE_KEY = 'furniture_cart';
+
+const getStockStatus = (countInStock) => {
+    if (countInStock === 0) return { label: 'Out of Stock', className: 'bg-red-100 text-red-800' };
+    if (countInStock <= 10) return { label: `Only ${countInStock} left`, className: 'bg-yellow-100 text-yellow-800' };
+    return { label: 'In Stock', className: 'bg-green-100 text-green-800' };
+};
 
 const Wishlist = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
@@ -65,6 +72,9 @@ const Wishlist = () => {
             const updatedIds = wishlistIds.filter(itemId => itemId !== id);
             Cookies.set(WISHLIST_COOKIE_KEY, JSON.stringify(updatedIds), { expires: 30 }); // Expires in 30 days
 
+            // Dispatch event to update wishlist badge
+            window.dispatchEvent(new Event('wishlistUpdated'));
+
             toast.success('Removed from wishlist');
         } catch (error) {
             console.error('Error removing from wishlist:', error);
@@ -74,8 +84,46 @@ const Wishlist = () => {
 
     const addToCart = async (item) => {
         try {
-            // Add to cart logic here
+            // Check if product is out of stock
+            if (item.countInStock === 0) {
+                toast.error('This product is out of stock');
+                return;
+            }
+
+            // Get current cart items
+            const currentCart = JSON.parse(Cookies.get(CART_COOKIE_KEY) || '[]');
+
+            // Check if item already exists in cart
+            const existingItemIndex = currentCart.findIndex(
+                cartItem => cartItem.productId === item.id
+            );
+
+            if (existingItemIndex !== -1) {
+                // Update quantity if item exists
+                if (currentCart[existingItemIndex].quantity >= item.countInStock) {
+                    toast.error('Cannot add more items than available in stock');
+                    return;
+                }
+                currentCart[existingItemIndex].quantity += 1;
+            } else {
+                // Add new item if it doesn't exist
+                currentCart.push({
+                    productId: item.id,
+                    quantity: 1,
+                    color: item.colors[0]?.name || 'N/A'
+                });
+            }
+
+            // Save updated cart to cookie
+            Cookies.set(CART_COOKIE_KEY, JSON.stringify(currentCart), { expires: 30 });
+
+            // Dispatch event to update cart badge
+            window.dispatchEvent(new Event('cartUpdated'));
+
             toast.success('Added to cart');
+
+            // Remove from wishlist and update wishlist badge
+            removeFromWishlist(item.id);
         } catch (error) {
             console.error('Error adding to cart:', error);
             toast.error('Failed to add item to cart');
@@ -153,7 +201,7 @@ const Wishlist = () => {
                                                 >
                                                     <FiTrash2 className="w-5 h-5" />
                                                 </button>
-                                                {item.inStock ? (
+                                                {item.countInStock > 0 ? (
                                                     <button
                                                         onClick={() => addToCart(item)}
                                                         className="flex items-center gap-2 px-4 py-2 bg-[#C4A484] text-white rounded-lg hover:bg-[#B39374] transition-colors"

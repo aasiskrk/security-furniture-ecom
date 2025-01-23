@@ -1,9 +1,10 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useState, useEffect } from 'react';
-import { FiSearch, FiShoppingCart, FiHeart, FiUser, FiChevronDown } from 'react-icons/fi';
+import { useState, useEffect, useRef } from 'react';
+import { FiSearch, FiShoppingCart, FiHeart, FiUser, FiChevronDown, FiArrowRight } from 'react-icons/fi';
 import { PiArmchairDuotone } from 'react-icons/pi';
 import Cookies from 'js-cookie';
+import { getAllProductsApi } from '../api/apis';
 
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 const CART_COOKIE_KEY = 'furniture_cart';
@@ -18,6 +19,11 @@ const Navbar = () => {
     const location = useLocation();
     const [wishlistCount, setWishlistCount] = useState(0);
     const [cartCount, setCartCount] = useState(0);
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchRef = useRef(null);
+    const navigate = useNavigate();
 
     // Check if current path is an admin page
     const isAdminPage = location.pathname.startsWith('/admin');
@@ -29,14 +35,72 @@ const Navbar = () => {
     const isWishlistPage = location.pathname.startsWith('/wishlist');
 
     const furnitureCategories = {
-        'Living Room': ['Sofas', 'Coffee Tables', 'TV Stands', 'Armchairs', 'Side Tables', 'Bookcases'],
-        'Bedroom': ['Beds', 'Wardrobes', 'Nightstands', 'Dressers', 'Mattresses', 'Bedroom Sets'],
-        'Dining Room': ['Dining Tables', 'Dining Chairs', 'Buffets', 'Bar Stools', 'China Cabinets'],
-        'Kitchen': ['Kitchen Islands', 'Bar Carts', 'Storage Cabinets', 'Pantry Units'],
-        'Office': ['Desks', 'Office Chairs', 'Filing Cabinets', 'Bookcases', 'Computer Tables'],
-        'Outdoor': ['Patio Sets', 'Garden Furniture', 'Outdoor Sofas', 'Dining Sets', 'Hammocks'],
-        'Kids': ['Beds', 'Wardrobes', 'Nightstands', 'Dressers', 'Mattresses', 'Bedroom Sets']
-
+        'Living Room': [
+            'Sofas',
+            'Coffee Tables',
+            'TV Stands',
+            'Armchairs',
+            'Side Tables',
+            'Bookcases'
+        ],
+        'Bedroom': [
+            'Beds',
+            'Wardrobes',
+            'Dressers',
+            'Nightstands',
+            'Bedroom Sets',
+            'Mattresses'
+        ],
+        'Dining Room': [
+            'Dining Tables',
+            'Dining Chairs',
+            'Dining Sets',
+            'Buffets & Sideboards',
+            'Bar Furniture'
+        ],
+        'Kitchen': [
+            'Kitchen Islands',
+            'Bar Stools',
+            'Kitchen Storage',
+            'Kitchen Tables',
+            'Kitchen Chairs'
+        ],
+        'Office': [
+            'Desks',
+            'Office Chairs',
+            'Filing Cabinets',
+            'Office Sets'
+        ],
+        'Outdoor': [
+            'Outdoor Sets',
+            'Outdoor Tables',
+            'Outdoor Chairs',
+            'Outdoor Sofas',
+            'Garden Furniture'
+        ],
+        'Kids': [
+            'Kids Beds',
+            'Study Tables',
+            'Storage Units',
+            'Play Furniture',
+            'Kids Chairs'
+        ],
+        'Storage': [
+            'Cabinets',
+            'Shelving Units',
+            'Storage Boxes',
+            'Wall Storage',
+            'Shoe Storage',
+            'Coat Racks'
+        ],
+        'Other': [
+            'Mirrors',
+            'Room Dividers',
+            'Bean Bags',
+            'Accent Furniture',
+            'Decorative Items',
+            'Miscellaneous'
+        ]
     };
 
     useEffect(() => {
@@ -116,6 +180,60 @@ const Navbar = () => {
         };
     }, []);
 
+    // Close search dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setShowSearchDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Remove the debounced search and replace with direct search
+    const handleSearchInput = async (e) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+
+        if (!query.trim()) {
+            setSearchResults([]);
+            setShowSearchDropdown(false);
+            return;
+        }
+
+        try {
+            setIsSearching(true);
+            setShowSearchDropdown(true);
+            const response = await getAllProductsApi({ search: query });
+            const products = response.data.products || [];
+            setSearchResults(products.slice(0, 5)); // Limit to 5 results
+        } catch (error) {
+            console.error('Search error:', error);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Handle search result click
+    const handleSearchResultClick = (productId) => {
+        setShowSearchDropdown(false);
+        setSearchQuery('');
+        navigate(`/product/${productId}`);
+    };
+
+    // Handle search form submit
+    const handleSearch = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+            setShowSearchDropdown(false);
+            setSearchQuery('');
+        }
+    };
+
     const scrollToTop = () => {
         window.scrollTo({
             top: 0,
@@ -144,9 +262,16 @@ const Navbar = () => {
         }
     };
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        console.log('Searching for:', searchQuery);
+    // Handle category navigation
+    const handleCategoryClick = (category, subcategory = null) => {
+        const searchParams = new URLSearchParams();
+        if (subcategory) {
+            searchParams.set('subcategory', subcategory);
+            searchParams.set('category', category); // Also set the parent category
+        } else {
+            searchParams.set('category', category);
+        }
+        window.location.href = `/shop?${searchParams.toString()}`;
     };
 
     return (
@@ -182,16 +307,64 @@ const Navbar = () => {
                         </div>
 
                         {/* Search Bar */}
-                        <div className="hidden xl:block flex-1 max-w-xl ml-24">
+                        <div className="hidden xl:block flex-1 max-w-xl ml-24 px-8" ref={searchRef}>
                             <form onSubmit={handleSearch} className="relative">
                                 <input
                                     type="text"
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search for furniture..."
-                                    className="w-full px-4 py-2 pl-10 pr-12 text-gray-600 bg-[#F5F5DC]/30 rounded-lg border border-gray-200 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none transition-all"
+                                    onChange={handleSearchInput}
+                                    placeholder="Search for products..."
+                                    className="w-full px-4 py-2 pl-10 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none transition-all"
                                 />
-                                <FiSearch className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                
+                                {/* Search Dropdown */}
+                                {showSearchDropdown && (searchResults.length > 0 || isSearching) && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
+                                        {isSearching ? (
+                                            <div className="p-4 text-center text-gray-500">
+                                                <div className="animate-spin w-5 h-5 border-2 border-[#C4A484] border-t-transparent rounded-full mx-auto mb-2"></div>
+                                                Searching...
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {searchResults.map(product => (
+                                                    <button
+                                                        key={product._id}
+                                                        onClick={() => handleSearchResultClick(product._id)}
+                                                        className="w-full flex items-center gap-4 p-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                                                    >
+                                                        <img
+                                                            src={`http://localhost:5000${product.pictures[0]}`}
+                                                            alt={product.name}
+                                                            className="w-12 h-12 object-cover rounded-md"
+                                                        />
+                                                        <div className="flex-1 text-left">
+                                                            <h4 className="text-sm font-medium text-gray-900 line-clamp-1">
+                                                                {product.name}
+                                                            </h4>
+                                                            <p className="text-xs text-gray-500">
+                                                                {product.category} • {product.subCategory}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            Rp {product.price.toLocaleString()}
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                                {searchQuery.trim() && (
+                                                    <button
+                                                        onClick={handleSearch}
+                                                        className="w-full p-3 text-sm text-[#C4A484] hover:bg-[#C4A484]/5 transition-colors flex items-center justify-center gap-2"
+                                                    >
+                                                        <span>View all results</span>
+                                                        <FiArrowRight className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </form>
                         </div>
 
@@ -255,7 +428,10 @@ const Navbar = () => {
                                             onMouseEnter={() => setActiveDropdown(category)}
                                             onMouseLeave={() => setActiveDropdown(null)}
                                         >
-                                            <button className="flex items-center space-x-1 text-[#4A3F35] font-medium hover:text-[#8B5E34] transition-colors h-full border-b-2 border-transparent hover:border-[#8B5E34]">
+                                            <button 
+                                                onClick={() => handleCategoryClick(category)}
+                                                className="flex items-center space-x-1 text-[#4A3F35] font-medium hover:text-[#8B5E34] transition-colors h-full border-b-2 border-transparent hover:border-[#8B5E34]"
+                                            >
                                                 <span>{category}</span>
                                                 <FiChevronDown className={`w-4 h-4 transition-transform duration-300 ${activeDropdown === category ? 'rotate-180' : ''}`} />
                                             </button>
@@ -268,13 +444,13 @@ const Navbar = () => {
                                             >
                                                 <div className="bg-[#DCC8AC] rounded-lg shadow-lg py-2 border border-[#C4A484]/20">
                                                     {furnitureCategories[category].map((item) => (
-                                                        <Link
+                                                        <button
                                                             key={item}
-                                                            to={`/category/${category.toLowerCase()}/${item.toLowerCase()}`}
-                                                            className="block px-4 py-2 text-sm text-[#4A3F35] hover:text-[#8B5E34] hover:bg-[#C4A484]/10 transition-colors font-medium"
+                                                            onClick={() => handleCategoryClick(category, item)}
+                                                            className="block w-full text-left px-4 py-2 text-sm text-[#4A3F35] hover:text-[#8B5E34] hover:bg-[#C4A484]/10 transition-colors font-medium"
                                                         >
                                                             {item}
-                                                        </Link>
+                                                        </button>
                                                     ))}
                                                 </div>
                                             </div>
