@@ -70,6 +70,22 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    accountLockUntil: {
+      type: Date,
+      default: null,
+    },
+    passwordLastChanged: {
+      type: Date,
+      default: Date.now,
+    },
+    passwordHistory: [{
+      password: String,
+      changedAt: Date
+    }],
     avatar: {
       type: String,
     },
@@ -90,8 +106,21 @@ userSchema.pre("save", async function (next) {
   }
 
   try {
+    // Add current password to history before changing
+    if (this.password) {
+      this.passwordHistory = this.passwordHistory || [];
+      if (this.passwordHistory.length >= 5) {
+        this.passwordHistory.shift(); // Remove oldest password if we have 5
+      }
+      this.passwordHistory.push({
+        password: this.password,
+        changedAt: new Date()
+      });
+    }
+
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    this.passwordLastChanged = new Date();
     next();
   } catch (error) {
     next(error);
@@ -105,6 +134,46 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   } catch (error) {
     throw new Error("Password comparison failed");
   }
+};
+
+// Method to check if password is expired (90 days)
+userSchema.methods.isPasswordExpired = function() {
+  const ninetyDaysInMs = 90 * 24 * 60 * 60 * 1000;
+  return Date.now() - this.passwordLastChanged.getTime() > ninetyDaysInMs;
+};
+
+// Method to check if account is locked
+userSchema.methods.isAccountLocked = function() {
+  return this.accountLockUntil && this.accountLockUntil > new Date();
+};
+
+// Method to increment failed login attempts
+userSchema.methods.incrementLoginAttempts = async function() {
+  this.failedLoginAttempts += 1;
+  
+  // Lock account after 5 failed attempts
+  if (this.failedLoginAttempts >= 5) {
+    this.accountLockUntil = new Date(Date.now() + 30 * 60 * 1000); // Lock for 30 minutes
+  }
+  
+  await this.save();
+};
+
+// Method to reset failed login attempts
+userSchema.methods.resetLoginAttempts = async function() {
+  this.failedLoginAttempts = 0;
+  this.accountLockUntil = null;
+  await this.save();
+};
+
+// Method to check if password was used before
+userSchema.methods.isPasswordReused = async function(newPassword) {
+  for (const historyEntry of this.passwordHistory) {
+    if (await bcrypt.compare(newPassword, historyEntry.password)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 module.exports = mongoose.model("User", userSchema);

@@ -29,6 +29,9 @@ const getAllUsers = async (req, res) => {
       status: user.isActive ? "Active" : "Inactive",
       orders: orderCountMap[user._id.toString()] || 0,
       lastLogin: user.lastLogin || user.createdAt,
+      failedLoginAttempts: user.failedLoginAttempts,
+      accountLockUntil: user.accountLockUntil,
+      passwordLastChanged: user.passwordLastChanged,
       createdAt: user.createdAt,
       avatar:
         user.avatar ||

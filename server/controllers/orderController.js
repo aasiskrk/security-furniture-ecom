@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const ActivityLog = require("../models/ActivityLog");
 const axios = require("axios");
 
 // Create new order
@@ -51,6 +52,26 @@ const createOrder = async (req, res) => {
       }
 
       const createdOrder = await order.save();
+
+      // Log order creation
+      await ActivityLog.create({
+        user: req.user._id,
+        action: 'order_create',
+        status: 'success',
+        details: {
+          orderId: createdOrder._id,
+          orderTotal: createdOrder.totalPrice,
+          paymentMethod: createdOrder.paymentMethod,
+          itemCount: createdOrder.orderItems.length,
+          shippingAddress: {
+            city: createdOrder.shippingAddress.city,
+            state: createdOrder.shippingAddress.state
+          }
+        },
+        ip: req.ip,
+        userAgent: req.get('user-agent')
+      });
+
       res.status(201).json(createdOrder);
     }
     // If payment method is eSewa, initiate eSewa payment
@@ -208,6 +229,8 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    const oldStatus = order.status;
+    
     // If order is being cancelled, restore stock
     if (status === "Cancelled" && order.status !== "Cancelled") {
       // Only restore stock if it was previously reduced (order was paid or COD)
@@ -229,12 +252,41 @@ const updateOrderStatus = async (req, res) => {
     }
 
     const updatedOrder = await order.save();
+
+    // Log order status change
+    await ActivityLog.create({
+      user: order.user,
+      action: 'order_status_update',
+      status: 'success',
+      details: {
+        orderId: order._id,
+        oldStatus,
+        newStatus: status,
+        orderTotal: order.totalPrice
+      },
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     res.status(200).json(updatedOrder);
   } catch (error) {
     console.error("Error updating order status:", error);
-    res
-      .status(500)
-      .json({ message: "Error updating order status", error: error.message });
+    // Log error
+    if (req.user) {
+      await ActivityLog.create({
+        user: req.user._id,
+        action: 'order_status_update',
+        status: 'failure',
+        details: {
+          orderId: req.params.id,
+          error: error.message,
+          attemptedStatus: req.body.status
+        },
+        ip: req.ip,
+        userAgent: req.get('user-agent')
+      });
+    }
+    res.status(500).json({ message: "Error updating order status", error: error.message });
   }
 };
 
@@ -426,9 +478,38 @@ const cancelOrder = async (req, res) => {
     order.status = "Cancelled";
     const updatedOrder = await order.save();
 
+    // Log order cancellation
+    await ActivityLog.create({
+      user: req.user._id,
+      action: 'order_cancel',
+      status: 'success',
+      details: {
+        orderId: order._id,
+        orderTotal: order.totalPrice,
+        reason: 'User cancelled',
+        orderStatus: order.status
+      },
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
     res.status(200).json(updatedOrder);
   } catch (error) {
     console.error("Error cancelling order:", error);
+    // Log cancellation failure
+    if (req.user) {
+      await ActivityLog.create({
+        user: req.user._id,
+        action: 'order_cancel',
+        status: 'failure',
+        details: {
+          orderId: req.params.id,
+          error: error.message
+        },
+        ip: req.ip,
+        userAgent: req.get('user-agent')
+      });
+    }
     res.status(500).json({ message: "Error cancelling order", error: error.message });
   }
 };
