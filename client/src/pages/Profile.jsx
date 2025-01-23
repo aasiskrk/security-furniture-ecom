@@ -7,6 +7,8 @@ import { updateProfileApi, changePasswordApi, getAddressesApi, addAddressApi, up
 import ActivityLogs from '../components/ActivityLogs';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import zxcvbn from 'zxcvbn';
+import { sanitizeObject, sanitizeName, sanitizeEmail } from '../utils/sanitize';
+import axios from 'axios';
 
 const Profile = () => {
     const { user, logout, updateUser } = useAuth();
@@ -73,23 +75,34 @@ const Profile = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const { data } = await updateProfileApi(profileForm);
+            const sanitizedData = {
+                name: sanitizeName(profileForm.name),
+                email: sanitizeEmail(profileForm.email)
+            };
+
+            if (!sanitizedData.name || !sanitizedData.email) {
+                toast.error('Please provide valid name and email');
+                setIsSubmitting(false);
+                return;
+            }
+
+            const response = await updateProfileApi(sanitizedData);
             
             // Update the user data in context using updateUser
             if (typeof updateUser === 'function') {
-                updateUser(data);
+                updateUser(response.data);
             }
             
             // Update local storage
-            localStorage.setItem('user', JSON.stringify(data));
+            localStorage.setItem('user', JSON.stringify(response.data));
             
             setIsEditing(false);
             toast.success('Profile updated successfully');
             
             // Reset form data to match new user data
             setProfileForm({
-                name: data.name,
-                email: data.email
+                name: response.data.name,
+                email: response.data.email
             });
         } catch (error) {
             console.error('Profile update error:', error);
@@ -152,52 +165,39 @@ const Profile = () => {
 
     const handleAddressSubmit = async (e) => {
         e.preventDefault();
-
-        // Validate all fields are filled
-        const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pinCode'];
-        const emptyFields = requiredFields.filter(field => !addressForm[field].trim());
-
-        if (emptyFields.length > 0) {
-            toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`);
-            return;
-        }
-
-        // Validate phone number format
-        const phoneRegex = /^\d{10,12}$/;
-        if (!phoneRegex.test(addressForm.phone.replace(/[-\s]/g, ''))) {
-            toast.error('Please enter a valid phone number (10-12 digits)');
-            return;
-        }
-
-        // Validate PIN code
-        const pinCodeRegex = /^\d{5,6}$/;
-        if (!pinCodeRegex.test(addressForm.pinCode.replace(/\s/g, ''))) {
-            toast.error('Please enter a valid PIN code (5-6 digits)');
-            return;
-        }
-
+        setIsSubmitting(true);
         try {
-            if (editingAddress) {
-                await updateAddressApi(editingAddress._id, addressForm);
-                toast.success('Address updated successfully');
-            } else {
-                await addAddressApi(addressForm);
-                toast.success('Address added successfully');
+            const sanitizedAddress = sanitizeObject(addressForm);
+
+            // Validate sanitized data
+            if (!sanitizedAddress.fullName || !sanitizedAddress.phone || 
+                !sanitizedAddress.address || !sanitizedAddress.city || 
+                !sanitizedAddress.state || !sanitizedAddress.pinCode) {
+                toast.error('Please provide valid address details');
+                setIsSubmitting(false);
+                return;
             }
 
-            fetchAddresses();
-            setShowAddressForm(false);
-            setEditingAddress(null);
-            setAddressForm({
-                fullName: '',
-                phone: '',
-                address: '',
-                city: '',
-                state: '',
-                pinCode: ''
-            });
+            const response = await addAddressApi(sanitizedAddress);
+
+            if (response.data) {
+                updateUser(response.data);
+                setAddressForm({
+                    fullName: '',
+                    phone: '',
+                    address: '',
+                    city: '',
+                    state: '',
+                    pinCode: '',
+                });
+                setShowAddressForm(false);
+                toast.success('Address added successfully');
+            }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to save address');
+            console.error('Error adding address:', error);
+            toast.error(error.response?.data?.message || 'Error adding address');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
