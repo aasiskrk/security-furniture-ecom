@@ -10,6 +10,7 @@ const {
   handleEsewaFailure,
   getAllOrders,
   updatePaymentStatus,
+  cancelOrder,
 } = require("../controllers/orderController");
 
 // Protected routes
@@ -18,6 +19,7 @@ router.get("/myorders", protect, getMyOrders);
 router.get("/:id", protect, getOrderById);
 router.put("/:id/status", protect, admin, updateOrderStatus);
 router.put("/:id/payment", protect, admin, updatePaymentStatus);
+router.put("/:id/cancel", protect, cancelOrder);
 
 // Admin routes
 router.get("/", protect, admin, getAllOrders);

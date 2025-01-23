@@ -12,6 +12,21 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "No order items" });
     }
 
+    // Validate stock for all items before creating order
+    for (const item of orderItems) {
+      const product = await Product.findById(item.product);
+      if (!product) {
+        return res
+          .status(400)
+          .json({ message: `Product ${item.product} not found` });
+      }
+      if (product.countInStock < item.quantity) {
+        return res.status(400).json({
+          message: `Insufficient stock for ${product.name}. Available: ${product.countInStock}`,
+        });
+      }
+    }
+
     // Calculate total price
     const totalPrice = orderItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -26,8 +41,15 @@ const createOrder = async (req, res) => {
       totalPrice,
     });
 
-    // If payment method is COD, create order directly
+    // If payment method is COD, create order and reduce stock
     if (paymentMethod === "COD") {
+      // Reduce stock for each item
+      for (const item of orderItems) {
+        const product = await Product.findById(item.product);
+        product.countInStock -= item.quantity;
+        await product.save();
+      }
+
       const createdOrder = await order.save();
       res.status(201).json(createdOrder);
     }
@@ -52,8 +74,8 @@ const createOrder = async (req, res) => {
         tAmt: totalPrice,
         pid: tempOrder._id.toString(),
         scd: MERCHANT_CODE,
-        su: `${BACKEND_URL}/api/orders/esewa/success`, // Backend success URL
-        fu: `${BACKEND_URL}/api/orders/esewa/failure?oid=${tempOrder._id}`, // Include order ID in failure URL
+        su: `${BACKEND_URL}/api/orders/esewa/success`,
+        fu: `${BACKEND_URL}/api/orders/esewa/failure?oid=${tempOrder._id}`,
       };
 
       res.status(201).json({
@@ -186,6 +208,20 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    // If order is being cancelled, restore stock
+    if (status === "Cancelled" && order.status !== "Cancelled") {
+      // Only restore stock if it was previously reduced (order was paid or COD)
+      if (order.isPaid || order.paymentMethod === "COD") {
+        for (const item of order.orderItems) {
+          const product = await Product.findById(item.product);
+          if (product) {
+            product.countInStock += item.quantity;
+            await product.save();
+          }
+        }
+      }
+    }
+
     order.status = status;
     if (status === "Delivered") {
       order.isDelivered = true;
@@ -236,6 +272,26 @@ const handleEsewaSuccess = async (req, res) => {
     if (!order) {
       console.error("Order not found:", oid);
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Validate stock again before confirming payment
+    for (const item of order.orderItems) {
+      const product = await Product.findById(item.product);
+      if (!product || product.countInStock < item.quantity) {
+        // If stock is insufficient, mark order as cancelled
+        order.status = "Cancelled";
+        await order.save();
+        return res.status(400).json({
+          message: `Insufficient stock for some items. Order cancelled.`,
+        });
+      }
+    }
+
+    // Reduce stock for each item
+    for (const item of order.orderItems) {
+      const product = await Product.findById(item.product);
+      product.countInStock -= item.quantity;
+      await product.save();
     }
 
     // Update order with payment details
@@ -343,6 +399,40 @@ const handleEsewaFailure = async (req, res) => {
   }
 };
 
+// Cancel order
+const cancelOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Check if user is authorized to cancel this order
+    if (order.user.toString() !== req.user._id.toString() && !req.user.isAdmin) {
+      return res.status(401).json({ message: "Not authorized to cancel this order" });
+    }
+
+    // Check if order can be cancelled
+    if (order.status !== "Pending" && order.status !== "Processing") {
+      return res.status(400).json({ message: "Order cannot be cancelled at this stage" });
+    }
+
+    if (order.isPaid) {
+      return res.status(400).json({ message: "Paid orders cannot be cancelled" });
+    }
+
+    // Update order status to cancelled
+    order.status = "Cancelled";
+    const updatedOrder = await order.save();
+
+    res.status(200).json(updatedOrder);
+  } catch (error) {
+    console.error("Error cancelling order:", error);
+    res.status(500).json({ message: "Error cancelling order", error: error.message });
+  }
+};
+
 module.exports = {
   createOrder,
   getOrderById,
@@ -352,4 +442,5 @@ module.exports = {
   updatePaymentStatus,
   handleEsewaSuccess,
   handleEsewaFailure,
+  cancelOrder,
 };

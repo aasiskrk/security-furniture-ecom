@@ -55,11 +55,23 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+      select: false,
     },
     role: {
       type: String,
       enum: ["user", "admin"],
       default: "user",
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    lastLogin: {
+      type: Date,
+      default: Date.now,
+    },
+    avatar: {
+      type: String,
     },
     addresses: [addressSchema],
   },
@@ -68,16 +80,31 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Hash password before saving
+// Hash password before saving ONLY if it's not already hashed
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
+
+  // Check if the password is already hashed
+  if (this.password.startsWith("$2a$") || this.password.startsWith("$2b$")) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw new Error("Password comparison failed");
+  }
 };
 
 module.exports = mongoose.model("User", userSchema);

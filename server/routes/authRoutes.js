@@ -4,11 +4,13 @@ const {
   register,
   login,
   getProfile,
+  updateProfile,
   addAddress,
   getAddresses,
   updateAddress,
   deleteAddress,
   setDefaultAddress,
+  changePassword,
 } = require("../controllers/authController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -18,6 +20,8 @@ router.post("/login", login);
 
 // Protected routes
 router.get("/profile", protect, getProfile);
+router.put("/profile", protect, updateProfile);
+router.put("/change-password", protect, changePassword);
 
 // Address routes
 router.post("/address", protect, addAddress);

@@ -14,6 +14,7 @@ const {
 const {
   getAllUsers,
   // getDashboardStats,
+  updateUserStatus,
   updateUserRole,
   deleteUser,
 } = require("../controllers/adminController");
@@ -23,6 +24,7 @@ const {
 
 // User management routes
 router.get("/users", protect, admin, getAllUsers);
+router.put("/users/:id/status", protect, admin, updateUserStatus);
 router.put("/users/:id/role", protect, admin, updateUserRole);
 router.delete("/users/:id", protect, admin, deleteUser);
 

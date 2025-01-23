@@ -6,35 +6,54 @@ const bcrypt = require("bcryptjs");
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    console.log("Registration attempt for email:", email);
 
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
+      console.log("Registration failed: User already exists:", email);
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
+    // Create user - password will be hashed by the model's pre-save hook
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
+      password,
       role: "user", // default role
     });
 
     if (user) {
-      res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id),
+      // Fetch the user without password for the response
+      const userResponse = await User.findById(user._id).select("-password");
+      console.log("User created successfully:", {
+        id: userResponse._id,
+        email: userResponse.email,
+        role: userResponse.role,
       });
+
+      const token = generateToken(user._id);
+      const response = {
+        _id: userResponse._id,
+        name: userResponse.name,
+        email: userResponse.email,
+        role: userResponse.role,
+        token: token,
+      };
+
+      console.log("Sending registration response:", {
+        ...response,
+        token: `${token.substring(0, 10)}...`,
+      });
+
+      res.status(201).json(response);
     }
   } catch (error) {
+    console.error("Registration error details:", {
+      message: error.message,
+      stack: error.stack,
+      type: error.constructor.name,
+    });
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -43,27 +62,91 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log("Login attempt for email:", email);
+
+    // Validate input
+    if (!email || !password) {
+      console.log("Login failed: Missing credentials");
+      return res
+        .status(400)
+        .json({ message: "Please provide email and password" });
+    }
 
     // Check for user email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password"); // Explicitly select password
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      console.log("Login failed: User not found:", email);
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    console.log("User found:", {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      hasPassword: !!user.password,
+      passwordLength: user.password?.length,
+      passwordType: typeof user.password,
+    });
+
+    // Validate password exists
+    if (!user.password) {
+      console.log("Login failed: User has no password set");
+      return res.status(401).json({ message: "Invalid account setup" });
     }
 
     // Check password
+    console.log("Comparing passwords...");
+    console.log("Input password type:", typeof password);
+    console.log("Input password length:", password.length);
+    console.log("Stored hashed password length:", user.password.length);
+
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Password comparison details:", {
+      inputPasswordProvided: !!password,
+      hashedPasswordExists: !!user.password,
+      passwordMatch: isMatch,
+      inputType: typeof password,
+      storedType: typeof user.password,
+    });
+
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      console.log("Login failed: Invalid password for user:", email);
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    res.status(200).json({
+    // Update last login time
+    user.lastLogin = new Date();
+    await user.save();
+    console.log("Last login time updated for user:", email);
+
+    // Generate token
+    const token = generateToken(user._id);
+    console.log("Token generated successfully for user:", {
+      id: user._id,
+      email: user.email,
+      tokenLength: token.length,
+    });
+
+    const response = {
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      token: generateToken(user._id),
+      token: token,
+    };
+
+    console.log("Sending login response:", {
+      ...response,
+      token: `${token.substring(0, 10)}...`,
     });
+
+    res.status(200).json(response);
   } catch (error) {
+    console.error("Login error details:", {
+      message: error.message,
+      stack: error.stack,
+      type: error.constructor.name,
+    });
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -81,11 +164,79 @@ const getProfile = async (req, res) => {
   }
 };
 
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { name, email } = req.body;
+
+    // Check if email is being changed and if it's already taken
+    if (email !== user.email) {
+      const emailExists = await User.findOne({ email });
+      if (emailExists) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+    }
+
+    user.name = name || user.name;
+    user.email = email || user.email;
+
+    const updatedUser = await user.save();
+    res.status(200).json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    // Check if current password matches
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
+  try {
+    const token = jwt.sign({ id }, process.env.JWT_SECRET, {
+      expiresIn: "30d",
+    });
+    console.log("JWT generated successfully for user ID:", id);
+    return token;
+  } catch (error) {
+    console.error("Error generating JWT:", error);
+    throw error;
+  }
 };
 
 // @desc    Add a new address
@@ -116,12 +267,10 @@ const addAddress = async (req, res) => {
     user.addresses.push(newAddress);
     await user.save();
 
-    res
-      .status(201)
-      .json({
-        message: "Address added successfully",
-        addresses: user.addresses,
-      });
+    res.status(201).json({
+      message: "Address added successfully",
+      addresses: user.addresses,
+    });
   } catch (error) {
     console.error("Error adding address:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -177,12 +326,10 @@ const updateAddress = async (req, res) => {
     address.pinCode = pinCode || address.pinCode;
 
     await user.save();
-    res
-      .status(200)
-      .json({
-        message: "Address updated successfully",
-        addresses: user.addresses,
-      });
+    res.status(200).json({
+      message: "Address updated successfully",
+      addresses: user.addresses,
+    });
   } catch (error) {
     console.error("Error updating address:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -217,11 +364,9 @@ const deleteAddress = async (req, res) => {
     address.deleteOne();
     await user.save();
 
-    res
-      .status(200)
-      .json({
-        message: "Address deleted successfully",
-        addresses: user.addresses,
+    res.status(200).json({
+      message: "Address deleted successfully",
+      addresses: user.addresses,
     });
   } catch (error) {
     console.error("Error deleting address:", error);
@@ -266,6 +411,8 @@ module.exports = {
   register,
   login,
   getProfile,
+  updateProfile,
+  changePassword,
   addAddress,
   getAddresses,
   updateAddress,
