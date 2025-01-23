@@ -582,16 +582,18 @@ const AdminOrders = () => {
                                             >
                                                 <FiEye className="w-5 h-5" />
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedOrder(order);
-                                                    setIsEditMode(true);
-                                                }}
-                                                className="text-[#C4A484] hover:text-[#8B5E34] transition-colors"
-                                                title="Edit Order"
-                                            >
-                                                <FiEdit2 className="w-5 h-5" />
-                                            </button>
+                                            {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedOrder(order);
+                                                        setIsEditMode(true);
+                                                    }}
+                                                    className="text-[#C4A484] hover:text-[#8B5E34] transition-colors"
+                                                    title="Edit Order"
+                                                >
+                                                    <FiEdit2 className="w-5 h-5" />
+                                                </button>
+                                            )}
                                             {order.status === 'Delivered' && !order.isPaid && (
                                                 <button
                                                     onClick={() => handleUpdatePayment(order._id)}

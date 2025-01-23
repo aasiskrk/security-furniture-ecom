@@ -4,6 +4,8 @@ const dotenv = require("dotenv");
 const fileUpload = require("express-fileupload");
 const path = require("path");
 const connectDB = require("./config/db");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
 
 // Load env vars
 dotenv.config();
@@ -14,8 +16,30 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true
+}));
 app.use(express.json());
+
+// Session configuration
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 24 * 60 * 60 // 1 day
+    }),
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    }
+  })
+);
+
 app.use(
   fileUpload({
     createParentPath: true,

@@ -44,7 +44,7 @@ const Wishlist = () => {
                         price: product.price,
                         color: product.colors[0]?.name || 'N/A',
                         category: product.category,
-                        image: product.pictures[0], // First picture
+                        image: product.pictures?.[0] || '', // Safely access first picture
                         inStock: product.countInStock > 0,
                         countInStock: product.countInStock
                     };
@@ -82,7 +82,7 @@ const Wishlist = () => {
         }
     };
 
-    const addToCart = async (item) => {
+    const addToCart = (item) => {
         try {
             // Check if product is out of stock
             if (item.countInStock === 0) {
@@ -110,7 +110,7 @@ const Wishlist = () => {
                 currentCart.push({
                     productId: item.id,
                     quantity: 1,
-                    color: item.colors[0]?.name || 'N/A'
+                    color: item.color || 'N/A'
                 });
             }
 

@@ -4,9 +4,12 @@ import { FiEdit2, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { updateProfileApi, changePasswordApi, getAddressesApi, addAddressApi, updateAddressApi, deleteAddressApi, setDefaultAddressApi } from '../api/apis';
+import ActivityLogs from '../components/ActivityLogs';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import zxcvbn from 'zxcvbn';
 
 const Profile = () => {
-    const { user, logout, setUser } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [showAddressForm, setShowAddressForm] = useState(false);
     const [editingAddress, setEditingAddress] = useState(null);
@@ -71,19 +74,26 @@ const Profile = () => {
         setIsSubmitting(true);
         try {
             const { data } = await updateProfileApi(profileForm);
-            // Update user in context and localStorage
-            const updatedUser = {
-                ...user,
-                name: data.name,
-                email: data.email,
-            };
-            setUser(updatedUser);
-            localStorage.setItem("user", JSON.stringify(updatedUser));
+            
+            // Update the user data in context using updateUser
+            if (typeof updateUser === 'function') {
+                updateUser(data);
+            }
+            
+            // Update local storage
+            localStorage.setItem('user', JSON.stringify(data));
+            
             setIsEditing(false);
-            toast.success("Profile updated successfully");
+            toast.success('Profile updated successfully');
+            
+            // Reset form data to match new user data
+            setProfileForm({
+                name: data.name,
+                email: data.email
+            });
         } catch (error) {
-            console.error("Profile update error:", error);
-            toast.error(error.response?.data?.message || "Error updating profile");
+            console.error('Profile update error:', error);
+            toast.error(error.response?.data?.message || 'Error updating profile');
         } finally {
             setIsSubmitting(false);
         }
@@ -95,6 +105,21 @@ const Profile = () => {
             toast.error("Passwords do not match");
             return;
         }
+
+        // Password requirements validation
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        if (!passwordRegex.test(passwordForm.newPassword)) {
+            toast.error("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character");
+            return;
+        }
+
+        // Check password strength
+        const passwordStrength = zxcvbn(passwordForm.newPassword);
+        if (passwordStrength.score < 3) {
+            toast.error("Please choose a stronger password. " + passwordStrength.feedback.warning);
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             await changePasswordApi({
@@ -113,7 +138,13 @@ const Profile = () => {
             navigate("/login");
         } catch (error) {
             console.error("Password change error:", error);
-            toast.error(error.response?.data?.message || "Error changing password");
+            const errorMessage = error.response?.data?.message || "Error changing password";
+            // Check if account is locked
+            if (errorMessage.includes("Account locked")) {
+                toast.error("Account locked due to too many failed attempts. Please try again later.");
+            } else {
+                toast.error(errorMessage);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -362,6 +393,9 @@ const Profile = () => {
                                     )}
                                 </button>
                             </div>
+                            <div className="mt-2">
+                                <PasswordStrengthMeter password={passwordForm.newPassword} />
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
@@ -589,6 +623,12 @@ const Profile = () => {
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Activity Logs Section */}
+            <div className="bg-white p-6 rounded-lg shadow-sm mt-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Activity Logs</h3>
+                <ActivityLogs />
             </div>
 
             {/* Delete Account Confirmation Modal */}

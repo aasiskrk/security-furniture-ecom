@@ -227,6 +227,52 @@ const ProductDetails = () => {
 
                 {/* Right Column - Product Info */}
                 <div className="lg:w-1/2">
+                    {/* Category and Subcategory Navigation */}
+                    <nav className="flex items-center gap-2 text-sm mb-6">
+                        <Link 
+                            to="/shop" 
+                            className="text-gray-500 hover:text-[#C4A484] transition-colors"
+                        >
+                            Shop
+                        </Link>
+                        <span className="text-gray-400">/</span>
+                        <Link 
+                            to={`/shop?category=${product.category}`}
+                            className="text-gray-500 hover:text-[#C4A484] transition-colors"
+                        >
+                            {product.category}
+                        </Link>
+                        {product.subCategory && (
+                            <>
+                                <span className="text-gray-400">/</span>
+                                <Link 
+                                    to={`/shop?category=${product.category}&subcategory=${product.subCategory}`}
+                                    className="text-gray-500 hover:text-[#C4A484] transition-colors"
+                                >
+                                    {product.subCategory}
+                                </Link>
+                            </>
+                        )}
+                    </nav>
+
+                    {/* Category and Subcategory Tags */}
+                    <div className="flex flex-wrap gap-2 mb-6">
+                        <Link
+                            to={`/shop?category=${product.category}`}
+                            className="px-3 py-1 bg-[#C4A484]/10 text-[#C4A484] rounded-full text-sm font-medium hover:bg-[#C4A484]/20 transition-colors"
+                        >
+                            {product.category}
+                        </Link>
+                        {product.subCategory && (
+                            <Link
+                                to={`/shop?category=${product.category}&subcategory=${product.subCategory}`}
+                                className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                            >
+                                {product.subCategory}
+                            </Link>
+                        )}
+                    </div>
+
                     {/* Status and Rating */}
                     <div className="flex items-center justify-between mb-6">
                         <div className="mb-6">
