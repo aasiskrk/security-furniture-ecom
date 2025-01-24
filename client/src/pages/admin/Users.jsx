@@ -3,6 +3,8 @@ import AdminLayout from '../../components/AdminLayout';
 import { FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { getAdminUsersApi, updateUserStatusApi, updateUserRoleApi, deleteUserApi } from '../../api/apis';
+import { sanitizeFormData, sanitizeSearchQuery } from '../../utils/sanitize';
+import axios from 'axios';
 
 const isPasswordExpiringSoon = (passwordLastChanged) => {
     if (!passwordLastChanged) return false;
@@ -57,12 +59,15 @@ const Users = () => {
 
     const handleUpdateStatus = async (userId, newStatus) => {
         try {
-            await updateUserStatusApi(userId, newStatus);
+            await updateUserStatusApi(userId, { status: newStatus });
+            // Update the user's status in the local state
+            setUsers(users.map(user => 
+                user._id === userId ? { ...user, status: newStatus } : user
+            ));
             toast.success('User status updated successfully');
-            fetchUsers(); // Refresh the list
         } catch (error) {
-            toast.error('Failed to update user status');
             console.error('Error updating user status:', error);
+            toast.error(error.response?.data?.message || 'Failed to update user status');
         }
     };
 
@@ -86,6 +91,34 @@ const Users = () => {
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to delete user');
             console.error('Error deleting user:', error);
+        }
+    };
+
+    const handleSearch = (e) => {
+        const sanitizedQuery = sanitizeSearchQuery(e.target.value);
+        setSearchTerm(sanitizedQuery);
+    };
+
+    const handleUpdateUser = async (userId, updates) => {
+        try {
+            const sanitizedData = sanitizeFormData(updates);
+            const response = await axios.put(
+                `${import.meta.env.VITE_API_URL}/admin/users/${userId}`,
+                sanitizedData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+            
+            setUsers(users.map(user => 
+                user._id === userId ? response.data : user
+            ));
+            toast.success('User updated successfully');
+        } catch (error) {
+            console.error('Update user error:', error);
+            toast.error(error.response?.data?.message || 'Failed to update user');
         }
     };
 
@@ -118,7 +151,7 @@ const Users = () => {
                                 type="text"
                                 placeholder="Search users..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={handleSearch}
                                 className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#C4A484]/20 focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/20 focus:outline-none bg-white"
                             />
                         </div>

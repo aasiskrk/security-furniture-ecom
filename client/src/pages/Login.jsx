@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { PiArmchairDuotone } from 'react-icons/pi';
 import { FiMail, FiLock } from 'react-icons/fi';
-import { sanitizeEmail } from '../utils/sanitize';
+import { sanitizeFormData } from '../utils/sanitize';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -35,30 +35,20 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const sanitizedEmail = sanitizeEmail(formData.email);
-            if (!sanitizedEmail) {
-                toast.error('Please provide a valid email address');
-                setLoading(false);
-                return;
-            }
-
-            const sanitizedData = {
-                email: sanitizedEmail,
-                password: formData.password // Password is handled separately by bcrypt
-            };
-
-            const userData = await login(sanitizedData);
+            const sanitizedData = sanitizeFormData(formData);
+            const userData = await login(sanitizedData.email, sanitizedData.password);
             
             if (userData?.role === 'admin') {
-                navigate('/admin/dashboard');
+                navigate('/admin');
             } else {
-                navigate('/profile');
+                navigate('/');
             }
         } catch (error) {
             console.error('Login error:', error);
             toast.error(error.response?.data?.message || 'Login failed');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (

@@ -7,7 +7,7 @@ import { updateProfileApi, changePasswordApi, getAddressesApi, addAddressApi, up
 import ActivityLogs from '../components/ActivityLogs';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import zxcvbn from 'zxcvbn';
-import { sanitizeObject, sanitizeName, sanitizeEmail } from '../utils/sanitize';
+import { sanitizeFormData } from '../utils/sanitize';
 import axios from 'axios';
 
 const Profile = () => {
@@ -22,6 +22,7 @@ const Profile = () => {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const [profileForm, setProfileForm] = useState({
         name: user?.name || '',
@@ -73,131 +74,117 @@ const Profile = () => {
 
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true);
+        setLoading(true);
+
         try {
-            const sanitizedData = {
-                name: sanitizeName(profileForm.name),
-                email: sanitizeEmail(profileForm.email)
-            };
-
-            if (!sanitizedData.name || !sanitizedData.email) {
-                toast.error('Please provide valid name and email');
-                setIsSubmitting(false);
-                return;
-            }
-
+            const sanitizedData = sanitizeFormData(profileForm);
             const response = await updateProfileApi(sanitizedData);
             
-            // Update the user data in context using updateUser
-            if (typeof updateUser === 'function') {
-                updateUser(response.data);
-            }
-            
-            // Update local storage
-            localStorage.setItem('user', JSON.stringify(response.data));
-            
-            setIsEditing(false);
-            toast.success('Profile updated successfully');
-            
-            // Reset form data to match new user data
+            updateUser(response.data);
             setProfileForm({
                 name: response.data.name,
                 email: response.data.email
             });
+            setIsEditing(false);
+            toast.success('Profile updated successfully');
         } catch (error) {
             console.error('Profile update error:', error);
-            toast.error(error.response?.data?.message || 'Error updating profile');
+            toast.error(error.response?.data?.message || 'Failed to update profile');
         } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
 
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-            toast.error("Passwords do not match");
-            return;
-        }
+        setLoading(true);
 
-        // Password requirements validation
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-        if (!passwordRegex.test(passwordForm.newPassword)) {
-            toast.error("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character");
-            return;
-        }
-
-        // Check password strength
-        const passwordStrength = zxcvbn(passwordForm.newPassword);
-        if (passwordStrength.score < 3) {
-            toast.error("Please choose a stronger password. " + passwordStrength.feedback.warning);
-            return;
-        }
-
-        setIsSubmitting(true);
         try {
-            await changePasswordApi({
-                currentPassword: passwordForm.currentPassword,
-                newPassword: passwordForm.newPassword,
-            });
-            toast.success("Password changed successfully");
-            // Clear password form
-            setPasswordForm({
-                currentPassword: "",
-                newPassword: "",
-                confirmPassword: "",
-            });
-            // Logout user after password change
-            logout();
-            navigate("/login");
-        } catch (error) {
-            console.error("Password change error:", error);
-            const errorMessage = error.response?.data?.message || "Error changing password";
-            // Check if account is locked
-            if (errorMessage.includes("Account locked")) {
-                toast.error("Account locked due to too many failed attempts. Please try again later.");
-            } else {
-                toast.error(errorMessage);
+            // Check if passwords match
+            if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+                toast.error('New passwords do not match');
+                setLoading(false);
+                return;
             }
+
+            // Check password strength
+            const result = zxcvbn(passwordForm.newPassword);
+            if (result.score < 3) {
+                toast.error('New password is too weak. Please use a stronger password.');
+                setLoading(false);
+                return;
+            }
+
+            // Only send required fields
+            const passwordData = {
+                currentPassword: passwordForm.currentPassword,
+                newPassword: passwordForm.newPassword
+            };
+            const sanitizedData = sanitizeFormData(passwordData);
+            await changePasswordApi(sanitizedData);
+            
+            setPasswordForm({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            toast.success('Password changed successfully');
+        } catch (error) {
+            console.error('Password change error:', error);
+            toast.error(error.response?.data?.message || 'Failed to change password');
         } finally {
-            setIsSubmitting(false);
+            setLoading(false);
         }
     };
 
     const handleAddressSubmit = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true);
+
+        // Validate all fields are filled
+        const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pinCode'];
+        const emptyFields = requiredFields.filter(field => !addressForm[field].trim());
+
+        if (emptyFields.length > 0) {
+            toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`);
+            return;
+        }
+
+        // Validate phone number format
+        const phoneRegex = /^\d{10,12}$/;
+        if (!phoneRegex.test(addressForm.phone.replace(/[-\s]/g, ''))) {
+            toast.error('Please enter a valid phone number (10-12 digits)');
+            return;
+        }
+
+        // Validate PIN code
+        const pinCodeRegex = /^\d{5,6}$/;
+        if (!pinCodeRegex.test(addressForm.pinCode.replace(/\s/g, ''))) {
+            toast.error('Please enter a valid PIN code (5-6 digits)');
+            return;
+        }
+
         try {
-            const sanitizedAddress = sanitizeObject(addressForm);
-
-            // Validate sanitized data
-            if (!sanitizedAddress.fullName || !sanitizedAddress.phone || 
-                !sanitizedAddress.address || !sanitizedAddress.city || 
-                !sanitizedAddress.state || !sanitizedAddress.pinCode) {
-                toast.error('Please provide valid address details');
-                setIsSubmitting(false);
-                return;
-            }
-
-            const response = await addAddressApi(sanitizedAddress);
-
-            if (response.data) {
-                updateUser(response.data);
-                setAddressForm({
-                    fullName: '',
-                    phone: '',
-                    address: '',
-                    city: '',
-                    state: '',
-                    pinCode: '',
-                });
-                setShowAddressForm(false);
+            if (editingAddress) {
+                await updateAddressApi(editingAddress._id, addressForm);
+                toast.success('Address updated successfully');
+            } else {
+                await addAddressApi(addressForm);
                 toast.success('Address added successfully');
             }
+
+            fetchAddresses();
+            setShowAddressForm(false);
+            setEditingAddress(null);
+            setAddressForm({
+                fullName: '',
+                phone: '',
+                address: '',
+                city: '',
+                state: '',
+                pinCode: ''
+            });
         } catch (error) {
-            console.error('Error adding address:', error);
-            toast.error(error.response?.data?.message || 'Error adding address');
-        } finally {
-            setIsSubmitting(false);
+            toast.error(error.response?.data?.message || 'Failed to save address');
         }
     };
 
@@ -307,10 +294,10 @@ const Profile = () => {
                         </div>
                         <button
                             type="submit"
-                            disabled={isSubmitting}
+                            disabled={loading}
                             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Saving...' : 'Save Changes'}
+                            {loading ? 'Saving...' : 'Save Changes'}
                         </button>
                     </form>
                 ) : (
@@ -428,10 +415,10 @@ const Profile = () => {
                         </div>
                         <button
                             type="submit"
-                            disabled={isSubmitting}
+                            disabled={loading}
                             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Changing Password...' : 'Change Password'}
+                            {loading ? 'Changing Password...' : 'Change Password'}
                         </button>
                     </form>
                 </div>
@@ -440,7 +427,7 @@ const Profile = () => {
             {/* Addresses Section */}
             <div className="bg-white p-6 rounded-lg shadow-sm mt-6">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">Addresses</h3>
+                    <h3 className="text-xl font-medium text-gray-900">Addresses</h3>
                     <button
                         onClick={() => {
                             setShowAddressForm(true);

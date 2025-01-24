@@ -611,7 +611,7 @@ const Home = () => {
                                                 <div className="flex items-center justify-between mt-auto">
                                                     <p className="text-gray-600 text-sm line-clamp-1">{product.material}</p>
                                                     <p className="font-medium text-gray-900 whitespace-nowrap">
-                                                        Rp {product.price.toLocaleString()}
+                                                        Nrp {product.price.toLocaleString()}
                                                     </p>
                                                 </div>
                                             </div>

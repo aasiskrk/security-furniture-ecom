@@ -39,8 +39,8 @@ const AdminOrders = () => {
             const searchLower = searchQuery.toLowerCase();
             const matchesSearch =
                 order._id.toLowerCase().includes(searchLower) ||
-                order.user.name.toLowerCase().includes(searchLower) ||
-                order.user.email.toLowerCase().includes(searchLower) ||
+                (order.user?.name?.toLowerCase().includes(searchLower) || false) ||
+                (order.user?.email?.toLowerCase().includes(searchLower) || false) ||
                 order.orderItems.some(item => item.name.toLowerCase().includes(searchLower));
             if (!matchesSearch) return false;
         }
@@ -62,8 +62,8 @@ const AdminOrders = () => {
             const searchLower = searchQuery.toLowerCase();
             const matchesSearch =
                 order._id.toLowerCase().includes(searchLower) ||
-                order.user.name.toLowerCase().includes(searchLower) ||
-                order.user.email.toLowerCase().includes(searchLower) ||
+                (order.user?.name?.toLowerCase().includes(searchLower) || false) ||
+                (order.user?.email?.toLowerCase().includes(searchLower) || false) ||
                 order.orderItems.some(item => item.name.toLowerCase().includes(searchLower));
             if (!matchesSearch) return false;
         }
@@ -219,7 +219,7 @@ const AdminOrders = () => {
                                                 <div className="mt-1 space-y-1 text-sm text-gray-600">
                                                     <p>Color: <span className="text-gray-900">{item.color}</span></p>
                                                     <p>Quantity: <span className="text-gray-900">{item.quantity}</span></p>
-                                                    <p>Price: <span className="text-gray-900">Rp {item.price.toLocaleString()}</span></p>
+                                                    <p>Price: <span className="text-gray-900">Nrp {item.price.toLocaleString()}</span></p>
                                                 </div>
                                             </div>
                                         </div>
@@ -228,7 +228,7 @@ const AdminOrders = () => {
                                 <div className="mt-6 pt-6 border-t border-[#C4A484]/10">
                                     <div className="flex justify-between items-center">
                                         <span className="text-lg font-medium text-gray-900">Total</span>
-                                        <span className="text-lg font-medium text-gray-900">Rp {order.totalPrice.toLocaleString()}</span>
+                                        <span className="text-lg font-medium text-gray-900">Nrp {order.totalPrice.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
@@ -240,8 +240,8 @@ const AdminOrders = () => {
                             <div className="bg-white rounded-xl border border-[#C4A484]/10 p-6">
                                 <h3 className="text-lg font-medium text-gray-900 mb-4">Customer</h3>
                                 <div className="space-y-2">
-                                    <p className="text-base font-medium text-gray-900">{order.user.name}</p>
-                                    <p className="text-sm text-gray-600">{order.user.email}</p>
+                                    <p className="text-base font-medium text-gray-900">{order.user?.name || 'Deleted User'}</p>
+                                    <p className="text-sm text-gray-600">{order.user?.email || 'N/A'}</p>
                                 </div>
                             </div>
 
@@ -476,11 +476,11 @@ const AdminOrders = () => {
                                                 #{formatOrderId(order._id)}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-sm text-amber-900">{order.user.name}</div>
-                                                <div className="text-xs text-amber-700">{order.user.email}</div>
+                                                <div className="text-sm text-amber-900">{order.user?.name || 'Deleted User'}</div>
+                                                <div className="text-xs text-amber-700">{order.user?.email || 'N/A'}</div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-amber-900">
-                                                Rp {order.totalPrice.toLocaleString()}
+                                                Nrp {order.totalPrice.toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-sm text-amber-900">
                                                 {order.paymentMethod}
@@ -549,8 +549,8 @@ const AdminOrders = () => {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{order.user.name}</div>
-                                                <div className="text-sm text-gray-500">{order.user.email}</div>
+                                                <div className="text-sm font-medium text-gray-900">{order.user?.name || 'Deleted User'}</div>
+                                                <div className="text-sm text-gray-500">{order.user?.email || 'N/A'}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -558,7 +558,7 @@ const AdminOrders = () => {
                                         {order.orderItems.length} item(s)
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-900">
-                                        Rp {order.totalPrice.toLocaleString()}
+                                        Nrp {order.totalPrice.toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentStatusColor(order.isPaid)}`}>

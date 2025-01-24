@@ -293,7 +293,7 @@ const ProductCard = ({ product, view }) => {
                         </div>
                         <div className="flex items-center justify-between mt-auto">
                             <p className="font-medium text-xl text-gray-900">
-                                Rp {product.price.toLocaleString()}
+                                Nrp {product.price.toLocaleString()}
                             </p>
                         </div>
                     </div>
@@ -398,7 +398,7 @@ const ProductCard = ({ product, view }) => {
                         <div className="flex items-center justify-between mt-auto">
                             <p className="text-gray-600 text-sm line-clamp-1">{product.material}</p>
                             <p className="font-medium text-gray-900 whitespace-nowrap">
-                                Rp {product.price.toLocaleString()}
+                                Nrp {product.price.toLocaleString()}
                             </p>
                         </div>
                     </div>
@@ -833,8 +833,8 @@ const Shop = () => {
                                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#C4A484]"
                                     />
                                     <div className="flex justify-between text-sm text-gray-600">
-                                        <span>Rp {selectedFilters.priceRange[0].toLocaleString()}</span>
-                                        <span>Rp {selectedFilters.priceRange[1].toLocaleString()}</span>
+                                        <span>Nrp {selectedFilters.priceRange[0].toLocaleString()}</span>
+                                        <span>Nrp {selectedFilters.priceRange[1].toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

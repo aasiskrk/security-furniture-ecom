@@ -6,6 +6,7 @@ const path = require("path");
 const connectDB = require("./config/db");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
+const { sanitizeMiddleware } = require('./middleware/sanitize');
 
 // Load env vars
 dotenv.config();
@@ -51,6 +52,9 @@ app.use(
 
 // Serve static files from uploads directory
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Apply sanitization middleware before routes
+app.use(sanitizeMiddleware);
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));

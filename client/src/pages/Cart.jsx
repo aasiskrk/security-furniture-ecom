@@ -191,7 +191,7 @@ const Cart = () => {
                                                         </button>
                                                     </div>
                                                     <p className="font-medium text-gray-900">
-                                                        Rp {(product.price * item.quantity).toLocaleString()}
+                                                        Nrp {(product.price * item.quantity).toLocaleString()}
                                                     </p>
                                                 </div>
                                                 {item.quantity >= product.countInStock && (
@@ -214,7 +214,7 @@ const Cart = () => {
                             <div className="space-y-4">
                                 <div className="flex justify-between text-[#8B5E34]">
                                     <span>Subtotal</span>
-                                    <span>Rp {calculateTotal().toLocaleString()}</span>
+                                    <span>Nrp {calculateTotal().toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-[#8B5E34]">
                                     <span>Shipping</span>
@@ -223,7 +223,7 @@ const Cart = () => {
                                 <div className="pt-4 border-t border-[#C4A484]/10">
                                     <div className="flex justify-between text-lg font-medium text-gray-900">
                                         <span>Total</span>
-                                        <span>Rp {calculateTotal().toLocaleString()}</span>
+                                        <span>Nrp {calculateTotal().toLocaleString()}</span>
                                     </div>
                                     <p className="mt-1 text-sm text-green-600">Free shipping on all orders!</p>
                                 </div>

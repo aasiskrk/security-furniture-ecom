@@ -5,10 +5,90 @@ import { FiPlus } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import Cookies from 'js-cookie';
 import { addAddressApi, getAddressesApi, setDefaultAddressApi, createOrderApi, getProductByIdApi } from '../api/apis';
-import { sanitizeObject } from '../utils/sanitize';
-import axios from 'axios';
+import { sanitizeFormData } from '../utils/sanitize';
 
 const CART_COOKIE_KEY = 'furniture_cart';
+
+// Function to generate HMAC using Web Crypto API
+async function generateHMAC(message, secret) {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const messageData = encoder.encode(message);
+
+    const cryptoKey = await window.crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+    );
+
+    const signature = await window.crypto.subtle.sign(
+        'HMAC',
+        cryptoKey,
+        messageData
+    );
+
+    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+// Function to generate eSewa payment form
+async function initiateEsewaPayment({ amount, orderId, successUrl, failureUrl }) {
+    try {
+        // Generate transaction UUID - format: YYMMDD-HHMMSS
+        const now = new Date();
+        const transaction_uuid = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+
+        const params = {
+            amount: amount.toString(),
+            tax_amount: "0",
+            total_amount: amount.toString(),
+            transaction_uuid,
+            product_code: "EPAYTEST",
+            product_service_charge: "0",
+            product_delivery_charge: "0",
+            success_url: successUrl,
+            failure_url: failureUrl,
+            signed_field_names: "total_amount,transaction_uuid,product_code"
+        };
+
+        // Create signature string
+        const signatureString = [
+            params.total_amount,
+            params.transaction_uuid,
+            params.product_code
+        ].join(',');
+
+        // Generate signature
+        const signature = await generateHMAC(signatureString, "8gBm/:&EnhH.1/q");
+
+        // Create and submit form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
+
+        // Add all parameters including signature
+        const allParams = {
+            ...params,
+            signature
+        };
+
+        Object.entries(allParams).forEach(([key, value]) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        return true;
+    } catch (error) {
+        console.error('Error initiating eSewa payment:', error);
+        return false;
+    }
+}
 
 const Checkout = () => {
     const navigate = useNavigate();
@@ -131,48 +211,48 @@ const Checkout = () => {
 
     const handleAddressSubmit = async (e) => {
         e.preventDefault();
-        setAddressLoading(true);
+
+        // Validate all fields are filled
+        const requiredFields = ['fullName', 'phone', 'address', 'city', 'state', 'pinCode'];
+        const emptyFields = requiredFields.filter(field => !addressForm[field].trim());
+
+        if (emptyFields.length > 0) {
+            toast.error(`Please fill in all required fields: ${emptyFields.join(', ')}`);
+            return;
+        }
+
+        // Validate phone number format (basic validation)
+        const phoneRegex = /^\d{10,12}$/;
+        if (!phoneRegex.test(addressForm.phone.replace(/[-\s]/g, ''))) {
+            toast.error('Please enter a valid phone number (10-12 digits)');
+            return;
+        }
+
+        // Validate PIN code (basic validation)
+        const pinCodeRegex = /^\d{5,6}$/;
+        if (!pinCodeRegex.test(addressForm.pinCode.replace(/\s/g, ''))) {
+            toast.error('Please enter a valid PIN code (5-6 digits)');
+            return;
+        }
 
         try {
-            const sanitizedAddress = sanitizeObject(addressForm);
-
-            // Validate sanitized data
-            if (!sanitizedAddress.fullName || !sanitizedAddress.phone || 
-                !sanitizedAddress.address || !sanitizedAddress.city || 
-                !sanitizedAddress.state || !sanitizedAddress.pinCode) {
-                toast.error('Please provide valid address details');
-                setAddressLoading(false);
-                return;
-            }
-
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/auth/address`,
-                sanitizedAddress,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`,
-                    },
-                }
-            );
-
-            if (response.data) {
-                updateUser(response.data);
-                setAddressForm({
-                    fullName: '',
-                    phone: '',
-                    address: '',
-                    city: '',
-                    state: '',
-                    pinCode: '',
-                });
-                setShowAddressForm(false);
-                toast.success('Address added successfully');
-            }
+            const response = await addAddressApi(addressForm);
+            setAddresses(response.data);
+            setSelectedAddress(response.data[response.data.length - 1]);
+            setShowAddressForm(false);
+            setAddressForm({
+                fullName: '',
+                phone: '',
+                address: '',
+                city: '',
+                state: '',
+                pinCode: ''
+            });
+            toast.success('Address added successfully');
         } catch (error) {
             console.error('Error adding address:', error);
-            toast.error(error.response?.data?.message || 'Error adding address');
+            toast.error(error.response?.data?.message || 'Failed to add address');
         }
-        setAddressLoading(false);
     };
 
     const handleSelectAddress = async (address) => {
@@ -201,45 +281,86 @@ const Checkout = () => {
 
     const handlePlaceOrder = async () => {
         if (!selectedAddress) {
-            toast.error('Please select a delivery address');
+            toast.error('Please select a shipping address');
             return;
         }
 
-        setOrderLoading(true);
+        if (!paymentMethod) {
+            toast.error('Please select a payment method');
+            return;
+        }
+
         try {
+            setIsProcessing(true);
+
             const orderData = {
-                address: selectedAddress._id,
-                paymentMethod,
-                items: cartItems.map(item => ({
+                orderItems: cartItems.map(item => ({
                     product: item.id,
+                    name: item.name,
                     quantity: item.quantity,
+                    price: item.price,
                     color: item.color
-                }))
+                })),
+                totalPrice: total,
+                paymentMethod,
+                shippingAddress: {
+                    fullName: selectedAddress.fullName,
+                    phone: selectedAddress.phone,
+                    address: selectedAddress.address,
+                    city: selectedAddress.city,
+                    state: selectedAddress.state,
+                    pinCode: selectedAddress.pinCode
+                }
             };
 
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/orders`,
-                orderData,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`,
-                    },
-                }
-            );
+            const response = await createOrderApi(orderData);
 
-            if (response.data) {
-                // Clear cart after successful order
+            // Handle COD orders
+            if (paymentMethod === 'COD') {
+                // Clear cart
                 Cookies.remove(CART_COOKIE_KEY);
                 // Dispatch event to update cart count in navbar
                 window.dispatchEvent(new Event('cartUpdated'));
+                // Redirect to orders page
+                navigate(`/order/${response.data._id}`);
                 toast.success('Order placed successfully!');
-                navigate(`/orders/${response.data._id}`);
+                return;
             }
+
+            // Handle eSewa payment
+            if (paymentMethod === 'eSewa') {
+                const { data: order } = response;
+                
+                if (!order || !order._id) {
+                    throw new Error('Order data is missing');
+                }
+
+                // Clear cart before redirecting
+                Cookies.remove(CART_COOKIE_KEY);
+                window.dispatchEvent(new Event('cartUpdated'));
+
+                // Initialize eSewa payment
+                const success = await initiateEsewaPayment({
+                    amount: total,
+                    orderId: order._id,
+                    successUrl: `${window.location.origin}/order/${order._id}?payment=success`,
+                    failureUrl: `${window.location.origin}/order/${order._id}?payment=failure`
+                });
+
+                if (!success) {
+                    throw new Error('Failed to initialize eSewa payment');
+                }
+                return;
+            }
+
+            throw new Error('Invalid payment method');
+
         } catch (error) {
             console.error('Error placing order:', error);
-            toast.error(error.response?.data?.message || 'Error placing order');
+            toast.error(error.message || 'Failed to place order. Please try again.');
+        } finally {
+            setIsProcessing(false);
         }
-        setOrderLoading(false);
     };
 
     if (loading || loadingCart) {
@@ -526,14 +647,14 @@ const Checkout = () => {
                                             <p className="text-sm text-[#8B5E34]">Color: {item.color}</p>
                                             <p className="text-sm text-[#8B5E34]">Qty: {item.quantity}</p>
                                         </div>
-                                        <p className="text-sm font-medium text-gray-900">Rp {item.price.toLocaleString()}</p>
+                                        <p className="text-sm font-medium text-gray-900">Nrp {item.price.toLocaleString()}</p>
                                     </div>
                                 ))}
                             </div>
                             <div className="mt-6 pt-4 border-t border-[#C4A484]/10">
                                 <div className="flex justify-between">
                                     <dt className="text-sm text-[#8B5E34]">Subtotal</dt>
-                                    <dd className="text-sm font-medium text-gray-900">Rp {subtotal.toLocaleString()}</dd>
+                                    <dd className="text-sm font-medium text-gray-900">Nrp {subtotal.toLocaleString()}</dd>
                                 </div>
                                 <div className="flex justify-between mt-2">
                                     <dt className="text-sm text-[#8B5E34]">Shipping</dt>
@@ -541,7 +662,7 @@ const Checkout = () => {
                                 </div>
                                 <div className="flex justify-between mt-4 pt-4 border-t border-[#C4A484]/10">
                                     <dt className="text-base font-medium text-gray-900">Order total</dt>
-                                    <dd className="text-base font-medium text-gray-900">Rp {total.toLocaleString()}</dd>
+                                    <dd className="text-base font-medium text-gray-900">Nrp {total.toLocaleString()}</dd>
                                 </div>
                             </div>
                             <div className="mt-6">

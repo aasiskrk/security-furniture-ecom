@@ -214,12 +214,12 @@ const OrderDetails = () => {
                                             <div className="mt-1 space-y-1 text-sm text-[#8B5E34]">
                                                 <p>Color: {item.color}</p>
                                                 <p>Quantity: {item.quantity}</p>
-                                                <p>Price: Rp {item.price.toLocaleString()}</p>
+                                                <p>Price: Nrp {item.price.toLocaleString()}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-medium text-gray-900">
-                                                Rp {(item.price * item.quantity).toLocaleString()}
+                                                Nrp {(item.price * item.quantity).toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -253,7 +253,7 @@ const OrderDetails = () => {
                             <div className="space-y-4">
                                 <div className="flex justify-between text-[#8B5E34]">
                                     <span>Subtotal</span>
-                                    <span>Rp {order.totalPrice.toLocaleString()}</span>
+                                    <span>Nrp {order.totalPrice.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-[#8B5E34]">
                                     <span>Shipping</span>
@@ -262,7 +262,7 @@ const OrderDetails = () => {
                                 <div className="pt-4 border-t border-[#C4A484]/10">
                                     <div className="flex justify-between text-lg font-medium text-gray-900">
                                         <span>Total</span>
-                                        <span>Rp {order.totalPrice.toLocaleString()}</span>
+                                        <span>Nrp {order.totalPrice.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

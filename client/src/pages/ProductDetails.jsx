@@ -289,7 +289,7 @@ const ProductDetails = () => {
 
                     {/* Price */}
                     <div className="flex items-center gap-4 mb-8">
-                        <span className="text-3xl font-bold text-[#8B5E34]">Rp {product.price.toLocaleString()}</span>
+                        <span className="text-3xl font-bold text-[#8B5E34]">Nrp {product.price.toLocaleString()}</span>
                     </div>
 
                     {/* Key Specifications */}
@@ -415,7 +415,7 @@ const ProductDetails = () => {
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600">{product.category}</span>
                                             <span className="font-medium text-[#8B5E34]">
-                                                Rp {product.price.toLocaleString()}
+                                                Nrp {product.price.toLocaleString()}
                                             </span>
                                         </div>
                                     </div>

@@ -3,33 +3,34 @@ import AdminLayout from '../../components/AdminLayout';
 import { FiEdit2, FiTrash2, FiPlus, FiSearch, FiX } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { createProductApi, getAllProductsApi, updateProductApi, deleteProductApi } from '../../api/apis.js';
+import { sanitizeFormData, sanitizePrice } from '../../utils/sanitize';
+import axios from 'axios';
 
 const ProductModal = ({ isOpen, onClose, product, mode }) => {
     const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        price: '',
-        category: '',
-        subCategory: '',
-        material: '',
-        colors: [{ name: '', code: '#000000' }],
-        dimensions: {
+        name: product?.name || '',
+        description: product?.description || '',
+        price: product?.price || '',
+        category: product?.category || '',
+        subCategory: product?.subCategory || '',
+        dimensions: product?.dimensions || {
             length: '',
             width: '',
             height: '',
             unit: 'inches'
         },
-        weight: {
+        colors: product?.colors || [],
+        material: product?.material || '',
+        features: product?.features || [],
+        weight: product?.weight || {
             value: '',
             unit: 'kg'
         },
-        countInStock: '',
-        features: [''],
-        pictures: []
+        countInStock: product?.countInStock || 0
     });
-
     const [files, setFiles] = useState([]);
     const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false);
 
     // Add subcategories map
     const categoryMap = {
@@ -147,39 +148,72 @@ const ProductModal = ({ isOpen, onClose, product, mode }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!validateForm()) return;
 
-        if (!validateForm()) {
-            toast.error('Please fill in all required fields');
-            return;
-        }
-
+        setLoading(true);
         try {
             const formDataToSend = new FormData();
-
-            // Append all files
-            files.forEach(file => {
-                formDataToSend.append('pictures', file);
-            });
-
-            // Clean up empty color entries
-            const cleanedFormData = {
-                ...formData,
-                colors: formData.colors.filter(color => color.name.trim() && color.code.trim())
+            
+            // Format the data before sending
+            const dataToSend = {
+                name: formData.name,
+                description: formData.description,
+                price: Number(formData.price),
+                category: formData.category,
+                subCategory: formData.subCategory,
+                dimensions: {
+                    length: Number(formData.dimensions.length),
+                    width: Number(formData.dimensions.width),
+                    height: Number(formData.dimensions.height),
+                    unit: formData.dimensions.unit || 'inches'
+                },
+                colors: formData.colors.filter(color => color.name && color.code),
+                material: formData.material,
+                features: formData.features.filter(feature => feature.trim()),
+                weight: {
+                    value: Number(formData.weight.value),
+                    unit: formData.weight.unit || 'kg'
+                },
+                countInStock: Number(formData.countInStock)
             };
 
-            // Append other form data
-            formDataToSend.append('data', JSON.stringify(cleanedFormData));
-
             if (mode === 'add') {
+                // For new products, send data as JSON string
+                formDataToSend.append('data', JSON.stringify(dataToSend));
+
+                // Append files for new products
+                if (files.length > 0) {
+                    files.forEach(file => {
+                        formDataToSend.append('pictures', file);
+                    });
+                }
+
                 await createProductApi(formDataToSend);
                 toast.success('Product added successfully');
             } else {
-                await updateProductApi(product._id, formDataToSend);
+                // For updates, send the data directly
+                if (files.length > 0) {
+                    // If there are new files, append them
+                    files.forEach(file => {
+                        formDataToSend.append('pictures', file);
+                    });
+                }
+                // Keep existing pictures if no new ones are uploaded
+                if (product.pictures) {
+                    dataToSend.pictures = product.pictures;
+                }
+                
+                await updateProductApi(product._id, dataToSend);
                 toast.success('Product updated successfully');
             }
+
             onClose();
+            window.location.reload(); // Refresh to show updated data
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Something went wrong');
+            console.error('Error saving product:', error);
+            toast.error(error.response?.data?.message || 'Failed to save product');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -793,7 +827,7 @@ const Products = () => {
                                             <div className="text-sm text-gray-500">{product.subCategory}</div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-900">
-                                            Rp {product.price.toLocaleString()}
+                                            Nrp {product.price.toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex text-sm ${product.countInStock > 0 ? (product.countInStock <= 10 ? 'text-yellow-600' : 'text-green-600') : 'text-red-600'}`}>

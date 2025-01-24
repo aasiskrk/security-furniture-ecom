@@ -5,6 +5,9 @@ import { FiSearch, FiShoppingCart, FiHeart, FiUser, FiChevronDown, FiArrowRight 
 import { PiArmchairDuotone } from 'react-icons/pi';
 import Cookies from 'js-cookie';
 import { getAllProductsApi } from '../api/apis';
+import { sanitizeSearchQuery } from '../utils/sanitize';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 const CART_COOKIE_KEY = 'furniture_cart';
@@ -24,6 +27,7 @@ const Navbar = () => {
     const [isSearching, setIsSearching] = useState(false);
     const searchRef = useRef(null);
     const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
 
     // Check if current path is an admin page
     const isAdminPage = location.pathname.startsWith('/admin');
@@ -227,12 +231,32 @@ const Navbar = () => {
     };
 
     // Handle search form submit
-    const handleSearch = (e) => {
+    const handleSearch = async (e) => {
         e.preventDefault();
-        if (searchQuery.trim()) {
-            navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-            setShowSearchDropdown(false);
-            setSearchQuery('');
+        setLoading(true);
+
+        try {
+            const sanitizedQuery = sanitizeSearchQuery(searchQuery);
+            if (!sanitizedQuery) {
+                setSearchResults([]);
+                return;
+            }
+
+            const response = await axios.get(
+                `${import.meta.env.VITE_API_URL}/products/search?q=${encodeURIComponent(sanitizedQuery)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                    }
+                }
+            );
+
+            setSearchResults(response.data);
+        } catch (error) {
+            console.error('Search error:', error);
+            toast.error('Failed to search products');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -350,7 +374,7 @@ const Navbar = () => {
                                                             </p>
                                                         </div>
                                                         <div className="text-sm font-medium text-gray-900">
-                                                            Rp {product.price.toLocaleString()}
+                                                            Nrp {product.price.toLocaleString()}
                                                         </div>
                                                     </button>
                                                 ))}

@@ -193,7 +193,7 @@ const UserOrders = () => {
                                         <div className="flex flex-col items-end gap-4">
                                             <div className="text-right">
                                                 <p className="text-2xl font-medium text-gray-900 mb-2">
-                                                    Rp {order.totalPrice.toLocaleString()}
+                                                    Nrp {order.totalPrice.toLocaleString()}
                                                 </p>
                                                 {order.isPaid && (
                                                     <p className="text-sm text-[#8B5E34]">

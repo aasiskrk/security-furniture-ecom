@@ -6,8 +6,7 @@ import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { PiArmchairDuotone } from 'react-icons/pi';
 import { FiUser, FiMail, FiLock } from 'react-icons/fi';
 import zxcvbn from 'zxcvbn';
-import { sanitizeEmail, sanitizeName } from '../utils/sanitize';
-import axios from 'axios';
+import { sanitizeFormData } from '../utils/sanitize';
 
 const Register = () => {
     const [name, setName] = useState('');
@@ -25,50 +24,30 @@ const Register = () => {
         setLoading(true);
 
         try {
-            const sanitizedName = sanitizeName(name);
-            const sanitizedEmail = sanitizeEmail(email);
-
-            if (!sanitizedName || !sanitizedEmail) {
-                toast.error('Please provide valid name and email');
-                setLoading(false);
-                return;
-            }
-
-            // Check password strength
-            const passwordStrength = zxcvbn(password);
-            if (passwordStrength.score < 3) {
-                toast.error('Please choose a stronger password. ' + passwordStrength.feedback.warning);
-                setLoading(false);
-                return;
-            }
-
-            // Check if passwords match
             if (password !== confirmPassword) {
                 toast.error('Passwords do not match');
-                setLoading(false);
                 return;
             }
 
-            const sanitizedData = {
-                name: sanitizedName,
-                email: sanitizedEmail,
-                password: password // Password is handled separately by bcrypt
-            };
-
-            const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/auth/register`,
-                sanitizedData
-            );
-
-            if (response.data) {
-                toast.success('Registration successful! Please login.');
-                navigate('/login');
+            const formData = { name, email, password };
+            const sanitizedData = sanitizeFormData(formData);
+            
+            // Check password strength
+            const result = zxcvbn(sanitizedData.password);
+            if (result.score < 3) {
+                toast.error('Password is too weak. Please use a stronger password.');
+                return;
             }
+
+            await register(sanitizedData.name, sanitizedData.email, sanitizedData.password);
+            navigate('/login');
+            toast.success('Registration successful! Please login.');
         } catch (error) {
             console.error('Registration error:', error);
             toast.error(error.response?.data?.message || 'Registration failed');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (

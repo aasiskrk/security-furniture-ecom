@@ -1,6 +1,8 @@
 const User = require("../models/User");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const { isValidMongoId } = require('../middleware/sanitize');
+const ActivityLog = require("../models/ActivityLog");
 
 // Get all users
 const getAllUsers = async (req, res) => {
@@ -89,88 +91,79 @@ const getAllUsers = async (req, res) => {
 // Update user status
 const updateUserStatus = async (req, res) => {
   try {
+    const { id } = req.params;
     const { status } = req.body;
-    const user = await User.findById(req.params.id);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    user.isActive = status === "Active";
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Convert status string to boolean isActive
+    user.isActive = status === 'Active';
     await user.save();
 
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.isActive ? "Active" : "Inactive",
-      lastLogin: user.lastLogin || user.createdAt,
-      createdAt: user.createdAt,
-    });
+    res.json({ message: 'User status updated successfully' });
   } catch (error) {
-    console.error("Error updating user status:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Update user status error:', error);
+    res.status(500).json({ message: 'Error updating user status' });
   }
 };
 
 // Update user role
 const updateUserRole = async (req, res) => {
   try {
+    const { id } = req.params;
     const { role } = req.body;
-    const user = await User.findById(req.params.id);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    // Only allow 'admin' or 'user' roles
-    if (!["admin", "user"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
+    // Validate role
+    const validRoles = ['user', 'admin'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     user.role = role;
     await user.save();
 
-    res.status(200).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.isActive ? "Active" : "Inactive",
-      lastLogin: user.lastLogin || user.createdAt,
-      createdAt: user.createdAt,
-    });
+    res.json({ message: 'User role updated successfully' });
   } catch (error) {
-    console.error("Error updating user role:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Update user role error:', error);
+    res.status(500).json({ message: 'Error updating user role' });
   }
 };
 
 // Delete user
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const { id } = req.params;
 
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(id);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Prevent deleting the last admin
-    if (user.role === "admin") {
-      const adminCount = await User.countDocuments({ role: "admin" });
-      if (adminCount <= 1) {
-        return res
-          .status(400)
-          .json({ message: "Cannot delete the last admin user" });
-      }
-    }
-
-    await user.deleteOne();
-    res.status(200).json({ message: "User deleted successfully" });
+    await User.findByIdAndDelete(id);
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error("Error deleting user:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Error deleting user' });
   }
 };
 

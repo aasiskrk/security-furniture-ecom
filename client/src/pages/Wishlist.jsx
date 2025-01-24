@@ -187,7 +187,7 @@ const Wishlist = () => {
                                                     <p className="text-[#8B5E34]">Category: {item.category}</p>
                                                     <p className="text-[#8B5E34]">Color: {item.color}</p>
                                                     <p className="text-lg font-medium text-gray-900 mt-2">
-                                                        Rp {item.price.toLocaleString()}
+                                                        Nrp {item.price.toLocaleString()}
                                                     </p>
                                                 </div>
                                             </div>

@@ -3,185 +3,105 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const ActivityLog = require("../models/ActivityLog");
 const axios = require("axios");
+const { isValidMongoId, isValidPhone, isValidPinCode } = require('../middleware/sanitize');
 
 // Create new order
 const createOrder = async (req, res) => {
   try {
-    const { orderItems, shippingAddress, paymentMethod } = req.body;
+    const { orderItems, totalPrice, paymentMethod, shippingAddress } = req.body;
+    const { fullName, phone, address, city, state, pinCode } = shippingAddress;
 
-    if (!orderItems || orderItems.length === 0) {
-      return res.status(400).json({ message: "No order items" });
+    // Validate required fields
+    if (!orderItems || !totalPrice || !paymentMethod || !fullName || !phone || !address || !city || !state || !pinCode) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Validate stock for all items before creating order
+    // Validate phone and PIN code
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ message: 'Please provide a valid phone number' });
+    }
+
+    if (!isValidPinCode(pinCode)) {
+      return res.status(400).json({ message: 'Please provide a valid PIN code' });
+    }
+
+    // Validate items array
+    if (!Array.isArray(orderItems) || orderItems.length === 0) {
+      return res.status(400).json({ message: 'Please provide valid order items' });
+    }
+
+    // Validate each item has required fields and valid product IDs
     for (const item of orderItems) {
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res
-          .status(400)
-          .json({ message: `Product ${item.product} not found` });
+      if (!item.product || !item.quantity || !item.price) {
+        return res.status(400).json({ message: 'Invalid item data' });
       }
-      if (product.countInStock < item.quantity) {
-        return res.status(400).json({
-          message: `Insufficient stock for ${product.name}. Available: ${product.countInStock}`,
-        });
+      if (!isValidMongoId(item.product)) {
+        return res.status(400).json({ message: 'Invalid product ID' });
       }
     }
 
-    // Calculate total price
-    const totalPrice = orderItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-
-    const order = new Order({
+    const order = await Order.create({
       user: req.user._id,
       orderItems,
-      shippingAddress,
-      paymentMethod,
       totalPrice,
+      paymentMethod,
+      shippingAddress: {
+        fullName,
+        phone,
+        address,
+        city,
+        state,
+        pinCode
+      }
     });
 
-    // If payment method is COD, create order and reduce stock
-    if (paymentMethod === "COD") {
-      // Reduce stock for each item
-      for (const item of orderItems) {
-        const product = await Product.findById(item.product);
-        product.countInStock -= item.quantity;
-        await product.save();
-      }
+    await ActivityLog.create({
+      user: req.user._id,
+      action: 'order_create',
+      status: 'success',
+      details: {
+        orderId: order._id,
+        totalPrice,
+        paymentMethod,
+        itemCount: orderItems.length
+      },
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
-      const createdOrder = await order.save();
-
-      // Log order creation
-      await ActivityLog.create({
-        user: req.user._id,
-        action: 'order_create',
-        status: 'success',
-        details: {
-          orderId: createdOrder._id,
-          orderTotal: createdOrder.totalPrice,
-          paymentMethod: createdOrder.paymentMethod,
-          itemCount: createdOrder.orderItems.length,
-          shippingAddress: {
-            city: createdOrder.shippingAddress.city,
-            state: createdOrder.shippingAddress.state
-          }
-        },
-        ip: req.ip,
-        userAgent: req.get('user-agent')
-      });
-
-      res.status(201).json(createdOrder);
-    }
-    // If payment method is eSewa, initiate eSewa payment
-    else if (paymentMethod === "eSewa") {
-      // For eSewa, we'll create a temporary order with a special status
-      order.status = "Payment Pending";
-      const tempOrder = await order.save();
-
-      // eSewa configuration from environment variables
-      const ESEWA_TEST_URL = process.env.ESEWA_TEST_URL;
-      const MERCHANT_CODE = process.env.ESEWA_MERCHANT_CODE;
-      const FRONTEND_URL = process.env.FRONTEND_URL;
-      const BACKEND_URL = `http://localhost:5000`;
-
-      // Create eSewa payment data
-      const esewaData = {
-        amt: totalPrice,
-        pdc: 0,
-        psc: 0,
-        txAmt: 0,
-        tAmt: totalPrice,
-        pid: tempOrder._id.toString(),
-        scd: MERCHANT_CODE,
-        su: `${BACKEND_URL}/api/orders/esewa/success`,
-        fu: `${BACKEND_URL}/api/orders/esewa/failure?oid=${tempOrder._id}`,
-      };
-
-      res.status(201).json({
-        order: tempOrder,
-        esewaData,
-        esewaUrl: ESEWA_TEST_URL,
-      });
-    }
+    res.status(201).json(order);
   } catch (error) {
-    console.error("Error creating order:", error);
-    res
-      .status(500)
-      .json({ message: "Error creating order", error: error.message });
+    console.error('Create order error:', error);
+    res.status(500).json({ message: 'Error creating order' });
   }
 };
 
 // Get order by ID
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate("user", "name email")
-      .populate({
-        path: "orderItems.product",
-        select: "name price pictures colors material dimensions",
-        model: "Product",
-      });
+    const { id } = req.params;
+
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid order ID' });
+    }
+
+    const order = await Order.findById(id)
+      .populate('user', 'name email')
+      .populate('orderItems.product', 'name pictures price');
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Check if the user is authorized to view this order
-    if (
-      order.user._id.toString() !== req.user._id.toString() &&
-      !req.user.isAdmin
-    ) {
-      return res
-        .status(401)
-        .json({ message: "Not authorized to view this order" });
+    // Check if user is authorized to view this order
+    if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view this order' });
     }
 
-    // Format the order data for response
-    const formattedOrder = {
-      _id: order._id,
-      user: order.user,
-      orderItems: order.orderItems.map((item) => ({
-        _id: item._id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        color: item.color,
-        product: item.product
-          ? {
-              _id: item.product._id,
-              name: item.product.name,
-              pictures: item.product.pictures,
-              colors: item.product.colors,
-              material: item.product.material,
-              dimensions: item.product.dimensions,
-            }
-          : null,
-      })),
-      shippingAddress: order.shippingAddress,
-      paymentMethod: order.paymentMethod,
-      paymentResult: order.paymentResult,
-      totalPrice: order.totalPrice,
-      status: order.status,
-      isPaid: order.isPaid,
-      paidAt: order.paidAt,
-      isDelivered: order.isDelivered,
-      deliveredAt: order.deliveredAt,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-    };
-
-    res.status(200).json(formattedOrder);
+    res.json(order);
   } catch (error) {
-    console.error("Error fetching order:", error);
-    if (error.name === "CastError") {
-      return res.status(400).json({ message: "Invalid order ID format" });
-    }
-    res.status(500).json({
-      message: "Error fetching order details",
-      error: error.message,
-    });
+    console.error('Get order error:', error);
+    res.status(500).json({ message: 'Error retrieving order' });
   }
 };
 
@@ -222,40 +142,29 @@ const getAllOrders = async (req, res) => {
 // Update order status (admin only)
 const updateOrderStatus = async (req, res) => {
   try {
+    const { id } = req.params;
     const { status } = req.body;
 
-    const order = await Order.findById(req.params.id);
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid order ID' });
+    }
+
+    const validStatuses = ['Processing', 'Shipped', 'Delivered', 'Cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid order status' });
+    }
+
+    const order = await Order.findById(id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: 'Order not found' });
     }
 
     const oldStatus = order.status;
-    
-    // If order is being cancelled, restore stock
-    if (status === "Cancelled" && order.status !== "Cancelled") {
-      // Only restore stock if it was previously reduced (order was paid or COD)
-      if (order.isPaid || order.paymentMethod === "COD") {
-        for (const item of order.orderItems) {
-          const product = await Product.findById(item.product);
-          if (product) {
-            product.countInStock += item.quantity;
-            await product.save();
-          }
-        }
-      }
-    }
-
     order.status = status;
-    if (status === "Delivered") {
-      order.isDelivered = true;
-      order.deliveredAt = Date.now();
-    }
+    await order.save();
 
-    const updatedOrder = await order.save();
-
-    // Log order status change
     await ActivityLog.create({
-      user: order.user,
+      user: req.user._id,
       action: 'order_status_update',
       status: 'success',
       details: {
@@ -268,25 +177,10 @@ const updateOrderStatus = async (req, res) => {
       userAgent: req.get('user-agent')
     });
 
-    res.status(200).json(updatedOrder);
+    res.json(order);
   } catch (error) {
-    console.error("Error updating order status:", error);
-    // Log error
-    if (req.user) {
-      await ActivityLog.create({
-        user: req.user._id,
-        action: 'order_status_update',
-        status: 'failure',
-        details: {
-          orderId: req.params.id,
-          error: error.message,
-          attemptedStatus: req.body.status
-        },
-        ip: req.ip,
-        userAgent: req.get('user-agent')
-      });
-    }
-    res.status(500).json({ message: "Error updating order status", error: error.message });
+    console.error('Update order status error:', error);
+    res.status(500).json({ message: 'Error updating order status' });
   }
 };
 

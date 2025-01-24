@@ -2,65 +2,46 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const ActivityLog = require("../models/ActivityLog");
+const { isValidEmail, isValidPhone, isValidPinCode } = require('../middleware/sanitize');
 
 // Register user
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    console.log("Registration attempt for email:", email);
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      console.log("Registration failed: User already exists:", email);
-      return res.status(400).json({ message: "User already exists" });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Create user - password will be hashed by the model's pre-save hook
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
     const user = await User.create({
       name,
       email,
       password,
-      role: "user", // default role
+      passwordLastChanged: new Date()
     });
 
-    if (user) {
-      // Fetch the user without password for the response
-      const userResponse = await User.findById(user._id).select("-password");
-      console.log("User created successfully:", {
-        id: userResponse._id,
-        email: userResponse.email,
-        role: userResponse.role,
-      });
+    await ActivityLog.create({
+      user: user._id,
+      action: 'register',
+      status: 'success',
+      details: { name, email },
+      ip: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
-      const token = generateToken(user._id);
-      
-      // Set session data
-      req.session.userId = user._id;
-      req.session.userRole = user.role;
-      
-      const response = {
-        _id: userResponse._id,
-        name: userResponse.name,
-        email: userResponse.email,
-        role: userResponse.role,
-        token: token,
-      };
-
-      console.log("Sending registration response:", {
-        ...response,
-        token: `${token.substring(0, 10)}...`,
-      });
-
-      res.status(201).json(response);
-    }
+    res.status(201).json({ message: 'Registration successful' });
   } catch (error) {
-    console.error("Registration error details:", {
-      message: error.message,
-      stack: error.stack,
-      type: error.constructor.name,
-    });
-    res.status(500).json({ message: "Server Error" });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Error registering user' });
   }
 };
 
@@ -225,46 +206,37 @@ const getProfile = async (req, res) => {
 // Update user profile
 const updateProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { name, email } = req.body;
+    const userId = req.user._id;
+
+    if (!name || !email) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    const { name, email } = req.body;
-    const changes = {};
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
+    }
 
-    // Track what fields are being updated
+    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const changes = {};
     if (name !== user.name) changes.name = { from: user.name, to: name };
     if (email !== user.email) changes.email = { from: user.email, to: email };
 
-    // Check if email is being changed and if it's already taken
-    if (email !== user.email) {
-      const emailExists = await User.findOne({ email });
-      if (emailExists) {
-        // Log failed attempt
-        await ActivityLog.create({
-          user: user._id,
-          action: 'profile_update',
-          status: 'failure',
-          details: {
-            reason: 'Email already exists',
-            attempted_email: email
-          },
-          ip: req.ip,
-          userAgent: req.get('user-agent')
-        });
-        return res.status(400).json({ message: "Email already exists" });
-      }
-    }
+    user.name = name;
+    user.email = email;
+    await user.save();
 
-    user.name = name || user.name;
-    user.email = email || user.email;
-
-    const updatedUser = await user.save();
-
-    // Log successful profile update
     await ActivityLog.create({
-      user: user._id,
+      user: userId,
       action: 'profile_update',
       status: 'success',
       details: Object.keys(changes).length > 0 ? changes : { message: 'No changes made' },
@@ -272,25 +244,13 @@ const updateProfile = async (req, res) => {
       userAgent: req.get('user-agent')
     });
 
-    // Send back complete user data (excluding password)
-    const userData = updatedUser.toObject();
-    delete userData.password;
-    
-    res.status(200).json(userData);
+    const userObject = user.toObject();
+    delete userObject.password;
+
+    res.json(userObject);
   } catch (error) {
-    console.error("Error updating profile:", error);
-    // Log error
-    if (req.user) {
-      await ActivityLog.create({
-        user: req.user._id,
-        action: 'profile_update',
-        status: 'failure',
-        details: { error: error.message },
-        ip: req.ip,
-        userAgent: req.get('user-agent')
-      });
-    }
-    res.status(500).json({ message: "Server Error" });
+    console.error('Profile update error:', error);
+    res.status(500).json({ message: 'Error updating profile' });
   }
 };
 
@@ -411,15 +371,25 @@ const generateToken = (id) => {
 // @access  Private
 const addAddress = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { fullName, phone, address, city, state, pinCode, isDefault } = req.body;
+    const userId = req.user._id;
+
+    if (!fullName || !phone || !address || !city || !state || !pinCode) {
+      return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    const { fullName, phone, address, city, state, pinCode } = req.body;
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ message: 'Please provide a valid phone number' });
+    }
 
-    // If this is the first address, make it default
-    const isDefault = user.addresses.length === 0;
+    if (!isValidPinCode(pinCode)) {
+      return res.status(400).json({ message: 'Please provide a valid PIN code' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const newAddress = {
       fullName,
@@ -428,50 +398,32 @@ const addAddress = async (req, res) => {
       city,
       state,
       pinCode,
-      isDefault,
+      isDefault: isDefault || false
     };
+
+    if (isDefault) {
+      user.addresses.forEach(addr => addr.isDefault = false);
+    }
 
     user.addresses.push(newAddress);
     await user.save();
 
-    // Log successful address addition
     await ActivityLog.create({
-      user: user._id,
+      user: userId,
       action: 'address_add',
       status: 'success',
       details: {
         addressId: user.addresses[user.addresses.length - 1]._id,
-        isDefault,
-        address: {
-          fullName,
-          address,
-          city,
-          state,
-          pinCode
-        }
+        isDefault: newAddress.isDefault
       },
       ip: req.ip,
       userAgent: req.get('user-agent')
     });
 
-    res.status(201).json({
-      message: "Address added successfully",
-      addresses: user.addresses,
-    });
+    res.json(user.addresses);
   } catch (error) {
-    console.error("Error adding address:", error);
-    // Log failed address addition
-    if (req.user) {
-      await ActivityLog.create({
-        user: req.user._id,
-        action: 'address_add',
-        status: 'failure',
-        details: { error: error.message },
-        ip: req.ip,
-        userAgent: req.get('user-agent')
-      });
-    }
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Add address error:', error);
+    res.status(500).json({ message: 'Error adding address' });
   }
 };
 

@@ -1,6 +1,7 @@
 const Product = require("../models/Product");
 const path = require("path");
 const fs = require("fs");
+const { isValidMongoId } = require('../middleware/sanitize');
 
 // Helper function to handle file upload
 const handleFileUpload = async (files) => {
@@ -121,14 +122,21 @@ const getProducts = async (req, res) => {
 // @access  Public
 const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    const { id } = req.params;
+
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
     }
-    res.status(200).json(product);
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json(product);
   } catch (error) {
-    console.error("Error getting product:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Get product error:', error);
+    res.status(500).json({ message: 'Error retrieving product' });
   }
 };
 
@@ -240,78 +248,63 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const productData = JSON.parse(req.body.data);
-    const {
-      name,
-      description,
-      price,
-      category,
-      subCategory,
-      dimensions,
-      colors,
-      material,
-      features,
-      weight,
-      countInStock,
-    } = productData;
+    const { id } = req.params;
 
-    const product = await Product.findById(req.params.id);
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    const product = await Product.findById(id);
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Validate dimensions if provided
-    if (
-      dimensions &&
-      (!dimensions.length || !dimensions.width || !dimensions.height)
-    ) {
-      return res.status(400).json({
-        message: "Please provide complete dimensions (length, width, height)",
-      });
-    }
-
-    // Validate colors if provided
-    if (colors && colors.length === 0) {
-      return res.status(400).json({
-        message: "Please provide at least one color option",
-      });
-    }
-
-    // Handle file uploads if new pictures are provided
-    let pictures = product.pictures;
+    // Handle file uploads if any
+    let pictures = product.pictures; // Keep existing pictures by default
     if (req.files && req.files.pictures) {
-      const newPictures = await handleFileUpload(req.files);
-      if (newPictures.length > 0) {
-        // Delete old pictures
-        for (const oldPicture of product.pictures) {
-          const oldPicturePath = path.join(__dirname, "..", oldPicture);
-          if (fs.existsSync(oldPicturePath)) {
-            fs.unlinkSync(oldPicturePath);
-          }
-        }
-        pictures = newPictures;
+      const uploadedPaths = await handleFileUpload(req.files);
+      if (uploadedPaths.length > 0) {
+        pictures = uploadedPaths;
       }
     }
 
-    // Update product
-    product.name = name || product.name;
-    product.description = description || product.description;
-    product.price = price || product.price;
-    product.category = category || product.category;
-    product.subCategory = subCategory || product.subCategory;
-    product.dimensions = dimensions || product.dimensions;
-    product.colors = colors || product.colors;
-    product.material = material || product.material;
-    product.pictures = pictures;
-    product.features = features || product.features;
-    product.weight = weight || product.weight;
-    product.countInStock = countInStock || product.countInStock;
+    // Merge the updates with existing data
+    const updates = {
+      ...req.body,
+      pictures
+    };
+    
+    // Validate price if it's being updated
+    if (updates.price && (isNaN(updates.price) || updates.price < 0)) {
+      return res.status(400).json({ message: 'Invalid price value' });
+    }
 
-    const updatedProduct = await product.save();
-    res.status(200).json(updatedProduct);
+    // Validate stock if it's being updated
+    if (updates.countInStock && (isNaN(updates.countInStock) || updates.countInStock < 0)) {
+      return res.status(400).json({ message: 'Invalid stock value' });
+    }
+
+    // Parse JSON strings if they exist
+    ['dimensions', 'weight', 'colors', 'features'].forEach(field => {
+      if (typeof updates[field] === 'string') {
+        try {
+          updates[field] = JSON.parse(updates[field]);
+        } catch (e) {
+          console.error(`Error parsing ${field}:`, e);
+        }
+      }
+    });
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    res.json(updatedProduct);
   } catch (error) {
-    console.error("Error updating product:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Update product error:', error);
+    res.status(500).json({ message: 'Error updating product' });
   }
 };
 
@@ -320,24 +313,22 @@ const updateProduct = async (req, res) => {
 // @access  Private/Admin
 const deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!isValidMongoId(id)) {
+      return res.status(400).json({ message: 'Invalid product ID' });
+    }
+
+    const product = await Product.findById(id);
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Delete product pictures
-    for (const picture of product.pictures) {
-      const picturePath = path.join(__dirname, "..", picture);
-      if (fs.existsSync(picturePath)) {
-        fs.unlinkSync(picturePath);
-      }
-    }
-
-    await product.deleteOne();
-    res.status(200).json({ message: "Product removed" });
+    await Product.findByIdAndDelete(id);
+    res.json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error("Error deleting product:", error);
-    res.status(500).json({ message: "Server Error", error: error.message });
+    console.error('Delete product error:', error);
+    res.status(500).json({ message: 'Error deleting product' });
   }
 };
 
