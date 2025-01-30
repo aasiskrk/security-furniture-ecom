@@ -6,7 +6,12 @@ const path = require("path");
 const connectDB = require("./config/db");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
+const helmet = require("helmet");
+const rateLimit = require('express-rate-limit');
 const { sanitizeMiddleware } = require('./middleware/sanitize');
+const xss = require('xss-clean');
+const https = require('https');
+const fs = require('fs');
 
 // Load env vars
 dotenv.config();
@@ -16,6 +21,34 @@ connectDB();
 
 const app = express();
 
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { message: 'Too many requests, please try again later.' }
+});
+
+// Apply rate limiting to all routes
+app.use('/api/', apiLimiter);
+
+// Security middleware with custom configuration
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: "cross-origin"
+    },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "*"],
+        connectSrc: ["'self'", process.env.FRONTEND_URL || "http://localhost:5173"]
+      }
+    }
+  })
+);
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -23,7 +56,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Session configuration
+// Session configuration with enhanced security
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key",
@@ -36,8 +69,12 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
-    }
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      path: '/'
+    },
+    rolling: true, // Reset expiry on every request
+    name: 'sessionId' // Change session cookie name from default 'connect.sid'
   })
 );
 
@@ -45,10 +82,25 @@ app.use(
   fileUpload({
     createParentPath: true,
     limits: {
-      fileSize: 10 * 1024 * 1024, // 5MB max file size
+      fileSize: 10 * 1024 * 1024, // 10MB max file size
     },
+    fileFilter: function (req, file, cb) {
+      // Allowed file types
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      
+      if (!allowedTypes.includes(file.mimetype)) {
+        return cb(new Error('Only .jpg, .jpeg and .png files are allowed!'), false);
+      }
+      cb(null, true);
+    },
+    useTempFiles: true,
+    tempFileDir: '/tmp/',
+    debug: process.env.NODE_ENV === 'development'
   })
 );
+
+// XSS Protection
+app.use(xss());
 
 // Serve static files from uploads directory
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -71,10 +123,26 @@ app.use((err, req, res, next) => {
 
 // Basic route
 app.get("/", (req, res) => {
-  res.send("Laptop E-commerce API is running");
+  res.send("Furniture ecom API is running");
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+
+// Check if we're in production
+if (process.env.NODE_ENV === 'production') {
+  // HTTPS configuration
+  const httpsOptions = {
+    key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+    cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
+  };
+
+  // Create HTTPS server
+  https.createServer(httpsOptions, app).listen(PORT, () => {
+    console.log(`Secure server is running on port ${PORT}`);
+  });
+} else {
+  // Development - use HTTP
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}

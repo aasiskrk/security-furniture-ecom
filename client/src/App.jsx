@@ -14,7 +14,6 @@ import Shop from './pages/Shop';
 import Wishlist from './pages/Wishlist';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
-import { AuthProvider } from './context/AuthContext';
 import Products from './pages/admin/Products';
 import Users from './pages/admin/Users';
 import AdminOrders from './pages/admin/AdminOrders';
@@ -63,9 +62,7 @@ const AppContent = () => {
 const App = () => {
   return (
     <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <AppContent />
     </Router>
   );
 };

@@ -16,12 +16,10 @@
     "@heroicons/react": "^2.2.0",
     "@mui/material": "^6.4.1",
     "axios": "^1.7.9",
-    "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "dompurify": "^3.2.3",
     "embla-carousel-autoplay": "^8.5.2",
     "embla-carousel-react": "^8.5.2",
-    "esewajs": "^1.0.12",
     "framer-motion": "^11.18.1",
     "js-cookie": "^3.0.5",
     "react": "^18.3.1",
@@ -29,6 +27,7 @@
     "react-google-recaptcha": "^3.1.0",
     "react-hot-toast": "^2.5.1",
     "react-router-dom": "^7.1.1",
+    "uuid": "^11.0.5",
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {

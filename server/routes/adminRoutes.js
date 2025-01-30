@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { protect, admin } = require("../middleware/authMiddleware");
 const {
   getAllOrders,
@@ -18,6 +19,16 @@ const {
   updateUserRole,
   deleteUser,
 } = require("../controllers/adminController");
+
+// Admin routes rate limiter
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 requests per 15 minutes
+  message: { message: 'Too many requests to admin routes, please try again later' }
+});
+
+// Apply admin rate limiter to all admin routes
+router.use(adminLimiter);
 
 // Dashboard
 // router.get("/dashboard", protect, admin, getDashboardStats);

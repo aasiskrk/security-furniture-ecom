@@ -9,87 +9,6 @@ import { sanitizeFormData } from '../utils/sanitize';
 
 const CART_COOKIE_KEY = 'furniture_cart';
 
-// Function to generate HMAC using Web Crypto API
-async function generateHMAC(message, secret) {
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(secret);
-    const messageData = encoder.encode(message);
-
-    const cryptoKey = await window.crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-
-    const signature = await window.crypto.subtle.sign(
-        'HMAC',
-        cryptoKey,
-        messageData
-    );
-
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
-}
-
-// Function to generate eSewa payment form
-async function initiateEsewaPayment({ amount, orderId, successUrl, failureUrl }) {
-    try {
-        // Generate transaction UUID - format: YYMMDD-HHMMSS
-        const now = new Date();
-        const transaction_uuid = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-
-        const params = {
-            amount: amount.toString(),
-            tax_amount: "0",
-            total_amount: amount.toString(),
-            transaction_uuid,
-            product_code: "EPAYTEST",
-            product_service_charge: "0",
-            product_delivery_charge: "0",
-            success_url: successUrl,
-            failure_url: failureUrl,
-            signed_field_names: "total_amount,transaction_uuid,product_code"
-        };
-
-        // Create signature string
-        const signatureString = [
-            params.total_amount,
-            params.transaction_uuid,
-            params.product_code
-        ].join(',');
-
-        // Generate signature
-        const signature = await generateHMAC(signatureString, "8gBm/:&EnhH.1/q");
-
-        // Create and submit form
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'https://rc-epay.esewa.com.np/api/epay/main/v2/form';
-
-        // Add all parameters including signature
-        const allParams = {
-            ...params,
-            signature
-        };
-
-        Object.entries(allParams).forEach(([key, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-        });
-
-        document.body.appendChild(form);
-        form.submit();
-        return true;
-    } catch (error) {
-        console.error('Error initiating eSewa payment:', error);
-        return false;
-    }
-}
-
 const Checkout = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -99,7 +18,6 @@ const Checkout = () => {
     const [loading, setLoading] = useState(true);
     const [cartItems, setCartItems] = useState([]);
     const [loadingCart, setLoadingCart] = useState(true);
-    const [paymentMethod, setPaymentMethod] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const location = useLocation();
 
@@ -285,11 +203,6 @@ const Checkout = () => {
             return;
         }
 
-        if (!paymentMethod) {
-            toast.error('Please select a payment method');
-            return;
-        }
-
         try {
             setIsProcessing(true);
 
@@ -302,7 +215,7 @@ const Checkout = () => {
                     color: item.color
                 })),
                 totalPrice: total,
-                paymentMethod,
+                paymentMethod: 'COD',
                 shippingAddress: {
                     fullName: selectedAddress.fullName,
                     phone: selectedAddress.phone,
@@ -314,46 +227,14 @@ const Checkout = () => {
             };
 
             const response = await createOrderApi(orderData);
-
-            // Handle COD orders
-            if (paymentMethod === 'COD') {
-                // Clear cart
-                Cookies.remove(CART_COOKIE_KEY);
-                // Dispatch event to update cart count in navbar
-                window.dispatchEvent(new Event('cartUpdated'));
-                // Redirect to orders page
-                navigate(`/order/${response.data._id}`);
-                toast.success('Order placed successfully!');
-                return;
-            }
-
-            // Handle eSewa payment
-            if (paymentMethod === 'eSewa') {
-                const { data: order } = response;
-                
-                if (!order || !order._id) {
-                    throw new Error('Order data is missing');
-                }
-
-                // Clear cart before redirecting
-                Cookies.remove(CART_COOKIE_KEY);
-                window.dispatchEvent(new Event('cartUpdated'));
-
-                // Initialize eSewa payment
-                const success = await initiateEsewaPayment({
-                    amount: total,
-                    orderId: order._id,
-                    successUrl: `${window.location.origin}/order/${order._id}?payment=success`,
-                    failureUrl: `${window.location.origin}/order/${order._id}?payment=failure`
-                });
-
-                if (!success) {
-                    throw new Error('Failed to initialize eSewa payment');
-                }
-                return;
-            }
-
-            throw new Error('Invalid payment method');
+            
+            // Clear cart
+            Cookies.remove(CART_COOKIE_KEY);
+            // Dispatch event to update cart count in navbar
+            window.dispatchEvent(new Event('cartUpdated'));
+            // Redirect to orders page
+            navigate(`/order/${response.data._id}`);
+            toast.success('Order placed successfully!');
 
         } catch (error) {
             console.error('Error placing order:', error);
@@ -599,35 +480,13 @@ const Checkout = () => {
                                 <h3 className="text-xl font-serif font-bold text-gray-900 mb-4">Payment Method</h3>
                                 <div className="space-y-4">
                                     <div
-                                        className={`border rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'COD'
-                                                ? 'border-[#C4A484] bg-[#F8F5F1] shadow-sm'
-                                                : 'border-[#C4A484]/10 hover:border-[#C4A484]/30 hover:bg-[#F8F5F1]/50'
-                                            }`}
-                                        onClick={() => setPaymentMethod('COD')}
+                                        className="border rounded-xl p-4 border-[#C4A484] bg-[#F8F5F1] shadow-sm"
                                     >
                                         <label className="flex items-center cursor-pointer">
                                             <div className="w-6 h-6 rounded-full border-2 border-[#C4A484] flex items-center justify-center mr-3">
-                                                {paymentMethod === 'COD' && (
-                                                    <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
-                                                )}
+                                                <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
                                             </div>
                                             <span className="text-gray-900">Cash on Delivery (COD)</span>
-                                        </label>
-                                    </div>
-                                    <div
-                                        className={`border rounded-xl p-4 cursor-pointer transition-all ${paymentMethod === 'eSewa'
-                                                ? 'border-[#C4A484] bg-[#F8F5F1] shadow-sm'
-                                                : 'border-[#C4A484]/10 hover:border-[#C4A484]/30 hover:bg-[#F8F5F1]/50'
-                                            }`}
-                                        onClick={() => setPaymentMethod('eSewa')}
-                                    >
-                                        <label className="flex items-center cursor-pointer">
-                                            <div className="w-6 h-6 rounded-full border-2 border-[#C4A484] flex items-center justify-center mr-3">
-                                                {paymentMethod === 'eSewa' && (
-                                                    <div className="w-3 h-3 rounded-full bg-[#C4A484]"></div>
-                                                )}
-                                            </div>
-                                            <span className="text-gray-900">eSewa</span>
                                         </label>
                                     </div>
                                 </div>
@@ -668,8 +527,8 @@ const Checkout = () => {
                             <div className="mt-6">
                                 <button
                                     onClick={handlePlaceOrder}
-                                    disabled={!selectedAddress || !paymentMethod || isProcessing || cartItems.length === 0}
-                                    className={`w-full py-3 rounded-xl transition-colors ${selectedAddress && paymentMethod && !isProcessing && cartItems.length > 0
+                                    disabled={!selectedAddress || isProcessing || cartItems.length === 0}
+                                    className={`w-full py-3 rounded-xl transition-colors ${selectedAddress && !isProcessing && cartItems.length > 0
                                         ? 'bg-[#C4A484] text-white hover:bg-[#B39374]'
                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         }`}
@@ -680,9 +539,7 @@ const Checkout = () => {
                                             ? 'Your cart is empty'
                                             : !selectedAddress
                                                 ? 'Select Address to Continue'
-                                                : !paymentMethod
-                                                    ? 'Select Payment Method'
-                                                    : 'Place Order'}
+                                                : 'Place Order'}
                                 </button>
                             </div>
                         </div>

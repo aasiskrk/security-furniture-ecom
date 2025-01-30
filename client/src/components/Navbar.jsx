@@ -251,10 +251,19 @@ const Navbar = () => {
                 }
             );
 
-            setSearchResults(response.data);
+            if (response.data && Array.isArray(response.data)) {
+                setSearchResults(response.data);
+                if (response.data.length === 0) {
+                    toast.error('No products found');
+                } else {
+                    // Navigate to shop page with search query
+                    navigate(`/shop?search=${encodeURIComponent(sanitizedQuery)}`);
+                }
+            }
         } catch (error) {
             console.error('Search error:', error);
-            toast.error('Failed to search products');
+            setSearchResults([]);
+            toast.error('No products found');
         } finally {
             setLoading(false);
         }
@@ -345,14 +354,14 @@ const Navbar = () => {
                                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 
                                 {/* Search Dropdown */}
-                                {showSearchDropdown && (searchResults.length > 0 || isSearching) && (
+                                {showSearchDropdown && (searchResults.length > 0 || isSearching || searchQuery.trim()) && (
                                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
                                         {isSearching ? (
                                             <div className="p-4 text-center text-gray-500">
                                                 <div className="animate-spin w-5 h-5 border-2 border-[#C4A484] border-t-transparent rounded-full mx-auto mb-2"></div>
                                                 Searching...
                                             </div>
-                                        ) : (
+                                        ) : searchResults.length > 0 ? (
                                             <>
                                                 {searchResults.map(product => (
                                                     <button
@@ -378,16 +387,18 @@ const Navbar = () => {
                                                         </div>
                                                     </button>
                                                 ))}
-                                                {searchQuery.trim() && (
-                                                    <button
-                                                        onClick={handleSearch}
-                                                        className="w-full p-3 text-sm text-[#C4A484] hover:bg-[#C4A484]/5 transition-colors flex items-center justify-center gap-2"
-                                                    >
-                                                        <span>View all results</span>
-                                                        <FiArrowRight className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={handleSearch}
+                                                    className="w-full p-3 text-sm text-[#C4A484] hover:bg-[#C4A484]/5 transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    <span>View all results</span>
+                                                    <FiArrowRight className="w-4 h-4" />
+                                                </button>
                                             </>
+                                        ) : searchQuery.trim() && (
+                                            <div className="p-4 text-center text-gray-500">
+                                                No products found
+                                            </div>
                                         )}
                                     </div>
                                 )}
