@@ -47,7 +47,7 @@ const ProductCard = ({ product, view }) => {
     useEffect(() => {
         const preloadImages = async () => {
             try {
-                const imagePaths = product.pictures.map(pic => `http://localhost:5000${pic}`);
+                const imagePaths = product.pictures.map(pic => `https://localhost:5000${pic}`);
                 await Promise.all(imagePaths.map(preloadImage));
                 setLoadedImages(new Set(imagePaths));
             } catch (error) {
@@ -91,7 +91,7 @@ const ProductCard = ({ product, view }) => {
         setIsImageLoaded(true);
     }, []);
 
-    const currentImageUrl = `http://localhost:5000${product.pictures[selectedImageIndex]}`;
+    const currentImageUrl = `https://localhost:5000${product.pictures[selectedImageIndex]}`;
 
     const handleAddToCart = (e) => {
         e.preventDefault(); // Prevent navigation
@@ -232,7 +232,7 @@ const ProductCard = ({ product, view }) => {
                                                 }`}
                                         >
                                             <img
-                                                src={`http://localhost:5000${pic}`}
+                                                src={`https://localhost:5000${pic}`}
                                                 alt={`${product.name} view ${index + 1}`}
                                                 className="w-full h-full object-cover"
                                                 loading="lazy"
@@ -348,7 +348,7 @@ const ProductCard = ({ product, view }) => {
                                             }`}
                                     >
                                         <img
-                                            src={`http://localhost:5000${pic}`}
+                                            src={`https://localhost:5000${pic}`}
                                             alt={`${product.name} view ${index + 1}`}
                                             className="w-full h-full object-cover"
                                             loading="lazy"
@@ -712,7 +712,7 @@ const Shop = () => {
             const visibleProducts = products.slice(0, 6); // Preload first 6 products
             visibleProducts.forEach(product => {
                 product.pictures.forEach(pic => {
-                    const src = `http://localhost:5000${pic}`;
+                    const src = `https://localhost:5000${pic}`;
                     preloadImage(src);
                 });
             });
@@ -823,8 +823,8 @@ const Shop = () => {
                                     <input
                                         type="range"
                                         min="0"
-                                        max="10000000"
-                                        step="100000"
+                                        max="1000000"
+                                        step="10000"
                                         value={selectedFilters.priceRange[1]}
                                         onChange={(e) => setSelectedFilters(prev => ({
                                             ...prev,

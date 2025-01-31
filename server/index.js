@@ -51,7 +51,7 @@ app.use(
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: process.env.FRONTEND_URL || "https://localhost:5173",
   credentials: true
 }));
 app.use(express.json());
@@ -67,14 +67,14 @@ app.use(
       ttl: 24 * 60 * 60 // 1 day
     }),
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 1 day
       path: '/'
     },
-    rolling: true, // Reset expiry on every request
-    name: 'sessionId' // Change session cookie name from default 'connect.sid'
+    rolling: true,
+    name: 'sessionId'
   })
 );
 
@@ -128,21 +128,28 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Check if we're in production
-if (process.env.NODE_ENV === 'production') {
-  // HTTPS configuration
-  const httpsOptions = {
-    key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-    cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
-  };
-
-  // Create HTTPS server
-  https.createServer(httpsOptions, app).listen(PORT, () => {
-    console.log(`Secure server is running on port ${PORT}`);
-  });
-} else {
-  // Development - use HTTP
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// Generate SSL certificates if they don't exist
+const certsDir = path.join(__dirname, 'certs');
+if (!fs.existsSync(certsDir)) {
+  fs.mkdirSync(certsDir);
+  const { exec } = require('child_process');
+  const command = `openssl req -x509 -newkey rsa:4096 -keyout ${path.join(certsDir, 'key.pem')} -out ${path.join(certsDir, 'cert.pem')} -days 365 -nodes -subj "/CN=localhost"`;
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error generating certificates:', error);
+      return;
+    }
+    console.log('SSL certificates generated successfully!');
   });
 }
+
+// HTTPS configuration
+const httpsOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
+};
+
+// Always create HTTPS server
+https.createServer(httpsOptions, app).listen(PORT, () => {
+  console.log(`Secure server is running on port ${PORT}`);
+});

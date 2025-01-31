@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Remove 'api' from baseURL as it's already in the routes
   axios.defaults.baseURL = process.env.NODE_ENV === 'production' 
     ? import.meta.env.VITE_API_URL 
-    : 'http://localhost:5000';
+    : 'https://localhost:5000';
 
   useEffect(() => {
     // Check if user is logged in

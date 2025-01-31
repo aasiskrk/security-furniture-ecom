@@ -201,7 +201,7 @@ const OrderDetails = () => {
                                 {order.orderItems.map((item, index) => (
                                     <div key={index} className="flex gap-6">
                                         <img
-                                            src={`http://localhost:5000${item.product?.pictures[0]}`}
+                                            src={`https://localhost:5000${item.product?.pictures[0]}`}
                                             alt={item.name}
                                             className="w-24 h-24 object-cover rounded-xl border border-[#C4A484]/10"
                                             onError={(e) => {

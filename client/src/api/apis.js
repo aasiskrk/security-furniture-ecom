@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://localhost:5000/api";
 
 // Creating an instance of axios
 const Api = axios.create({
@@ -8,6 +8,7 @@ const Api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true
 });
 
 // Add token to requests if it exists
@@ -19,11 +20,11 @@ Api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor to handle token expiration
+// Response interceptor to handle errors
 Api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    console.log("API Error Interceptor:", {
+  async (error) => {
+    console.log("API Error:", {
       status: error.response?.status,
       url: error.config?.url,
       method: error.config?.method,
@@ -31,12 +32,10 @@ Api.interceptors.response.use(
 
     // Handle 401 errors
     if (error.response?.status === 401) {
-      console.log("Unauthorized error detected in API call");
-      // Only clear auth data if we're not already on the login page
       if (!window.location.pathname.includes("login")) {
-        console.log("Clearing auth data...");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        window.location.href = '/login';
       }
     }
 
@@ -49,12 +48,9 @@ export const registerApi = (data) => Api.post("/auth/register", data);
 export const loginApi = (data) => Api.post("/auth/login", data);
 export const getCurrentUserApi = () => Api.get("/auth/me");
 export const updateProfileApi = (data) => Api.put("/auth/profile", data);
-export const changePasswordApi = (data) =>
-  Api.put("/auth/change-password", data);
-export const forgotPasswordApi = (data) =>
-  Api.post("/auth/forgot-password", data);
-export const resetPasswordApi = (data) =>
-  Api.post("/auth/reset-password", data);
+export const changePasswordApi = (data) => Api.put("/auth/change-password", data);
+export const forgotPasswordApi = (data) => Api.post("/auth/forgot-password", data);
+export const resetPasswordApi = (data) => Api.post("/auth/reset-password", data);
 
 // Logout function
 export const logout = () => {

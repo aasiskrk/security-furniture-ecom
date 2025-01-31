@@ -370,7 +370,7 @@ const Navbar = () => {
                                                         className="w-full flex items-center gap-4 p-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
                                                     >
                                                         <img
-                                                            src={`http://localhost:5000${product.pictures[0]}`}
+                                                            src={`https://localhost:5000${product.pictures[0]}`}
                                                             alt={product.name}
                                                             className="w-12 h-12 object-cover rounded-md"
                                                         />

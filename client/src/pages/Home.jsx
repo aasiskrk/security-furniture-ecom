@@ -586,7 +586,7 @@ const Home = () => {
                                         <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-200 h-full flex flex-col">
                                             <div className="relative aspect-square overflow-hidden">
                                                 <img
-                                                    src={`http://localhost:5000${product.pictures[0]}`}
+                                                    src={`https://localhost:5000${product.pictures[0]}`}
                                                     alt={product.name}
                                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                     loading="lazy"

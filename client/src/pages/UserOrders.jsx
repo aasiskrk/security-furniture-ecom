@@ -125,7 +125,7 @@ const UserOrders = () => {
                                                 {order.orderItems.slice(0, 3).map((item, index) => (
                                                     <div key={item._id || index} className="relative">
                                                         <img
-                                                            src={`http://localhost:5000${item.product?.pictures[0]}`}
+                                                            src={`https://localhost:5000${item.product?.pictures[0]}`}
                                                             alt={item.name}
                                                             className="w-32 h-32 object-cover rounded-xl border border-[#C4A484]/10"
                                                         />

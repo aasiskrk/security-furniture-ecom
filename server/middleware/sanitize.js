@@ -27,11 +27,7 @@ const sanitizeData = (data) => {
 
 const sanitizeMiddleware = (req, res, next) => {
     try {
-        // Skip sanitization for eSewa routes
-        if (req.originalUrl.includes('/esewa')) {
-            return next();
-        }
-
+       
         if (req.body) {
             req.body = sanitizeData(req.body);
         }

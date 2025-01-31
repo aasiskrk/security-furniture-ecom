@@ -812,7 +812,7 @@ const Products = () => {
                                                 <div className="h-16 w-16 flex-shrink-0">
                                                     <img
                                                         className="h-16 w-16 rounded-lg object-cover border border-[#C4A484]/10"
-                                                        src={`http://localhost:5000${product.pictures[0]}`}
+                                                        src={`https://localhost:5000${product.pictures[0]}`}
                                                         alt={product.name}
                                                     />
                                                 </div>

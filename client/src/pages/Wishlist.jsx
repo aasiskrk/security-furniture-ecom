@@ -174,7 +174,7 @@ const Wishlist = () => {
                                         <div className="flex items-center gap-6">
                                             <div className="flex-shrink-0">
                                                 <img
-                                                    src={`http://localhost:5000${item.image}`}
+                                                    src={`https://localhost:5000${item.image}`}
                                                     alt={item.name}
                                                     className="w-24 h-24 object-cover rounded-lg"
                                                 />
