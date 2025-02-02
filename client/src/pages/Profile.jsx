@@ -9,6 +9,7 @@ import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import zxcvbn from 'zxcvbn';
 import { sanitizeFormData } from '../utils/sanitize';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 
 const Profile = () => {
     const { user, logout, updateUser } = useAuth();
@@ -232,6 +233,14 @@ const Profile = () => {
         }
     };
 
+    // Add sanitization function
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
+    };
+
     const renderProfile = () => (
         <div className="max-w-3xl mx-auto">
             <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -243,8 +252,8 @@ const Profile = () => {
                             className="w-20 h-20 rounded-full"
                         />
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
-                            <p className="text-gray-500">{user?.email}</p>
+                            <h2 className="text-2xl font-bold text-gray-900">{sanitizeContent(user?.name)}</h2>
+                            <p className="text-gray-500">{sanitizeContent(user?.email)}</p>
                             <span className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user?.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                                 }`}>
                                 {user?.role === 'admin' ? 'Administrator' : 'User'}
@@ -305,11 +314,11 @@ const Profile = () => {
                         <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Name</dt>
-                                <dd className="mt-1 text-sm text-gray-900">{user?.name}</dd>
+                                <dd className="mt-1 text-sm text-gray-900">{sanitizeContent(user?.name)}</dd>
                             </div>
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Email</dt>
-                                <dd className="mt-1 text-sm text-gray-900">{user?.email}</dd>
+                                <dd className="mt-1 text-sm text-gray-900">{sanitizeContent(user?.email)}</dd>
                             </div>
                             <div>
                                 <dt className="text-sm font-medium text-gray-500">Role</dt>
@@ -553,10 +562,10 @@ const Profile = () => {
                             <div key={address._id} className="border rounded-lg p-4">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <p className="font-medium text-gray-900">{address.fullName}</p>
-                                        <p className="text-gray-600 mt-1">{address.phone}</p>
-                                        <p className="text-gray-600">{address.address}</p>
-                                        <p className="text-gray-600">{address.city}, {address.state} {address.pinCode}</p>
+                                        <p className="font-medium text-gray-900">{sanitizeContent(address.fullName)}</p>
+                                        <p className="text-gray-600 mt-1">{sanitizeContent(address.phone)}</p>
+                                        <p className="text-gray-600">{sanitizeContent(address.address)}</p>
+                                        <p className="text-gray-600">{sanitizeContent(address.city)}, {sanitizeContent(address.state)} {sanitizeContent(address.pinCode)}</p>
                                         {address.isDefault && (
                                             <span className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                 Default Address

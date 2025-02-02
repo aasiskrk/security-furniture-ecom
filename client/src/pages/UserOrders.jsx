@@ -3,6 +3,7 @@ import { FiPackage, FiClock, FiCalendar, FiCreditCard, FiMapPin, FiCheck, FiX, F
 import { toast } from 'react-hot-toast';
 import { getMyOrdersApi, cancelOrderApi } from '../api/apis';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 
 const UserOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -72,6 +73,14 @@ const UserOrders = () => {
                 return newSet;
             });
         }
+    };
+
+    // Add sanitization function
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
     };
 
     if (loading) {
@@ -162,17 +171,17 @@ const UserOrders = () => {
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <FiCreditCard className="w-4 h-4" />
-                                                        <span>{order.paymentMethod}</span>
+                                                        <span>{sanitizeContent(order.paymentMethod)}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
                                                         <FiMapPin className="w-4 h-4" />
-                                                        <span>{order.shippingAddress.city}, {order.shippingAddress.state}</span>
+                                                        <span>{sanitizeContent(order.shippingAddress.city)}, {sanitizeContent(order.shippingAddress.state)}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap gap-3">
                                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getStatusColor(order.status)}`}>
                                                         <FiPackage className="w-4 h-4" />
-                                                        {order.status}
+                                                        {sanitizeContent(order.status)}
                                                     </span>
                                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getPaymentStatusColor(order.isPaid)}`}>
                                                         {order.isPaid ? (

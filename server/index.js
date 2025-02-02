@@ -84,20 +84,32 @@ app.use(
     limits: {
       fileSize: 10 * 1024 * 1024, // 10MB max file size
     },
-    fileFilter: function (req, file, cb) {
-      // Allowed file types
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      
-      if (!allowedTypes.includes(file.mimetype)) {
-        return cb(new Error('Only .jpg, .jpeg and .png files are allowed!'), false);
-      }
-      cb(null, true);
-    },
     useTempFiles: true,
-    tempFileDir: '/tmp/',
-    debug: process.env.NODE_ENV === 'development'
+    tempFileDir: path.join(__dirname, 'tmp'),
+    debug: process.env.NODE_ENV === 'development',
+    safeFileNames: true,
+    preserveExtension: true,
+    abortOnLimit: true,
+    uploadTimeout: 30000
   })
 );
+
+// Custom middleware to validate file types
+app.use((req, res, next) => {
+  if (!req.files) return next();
+
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  const files = req.files.pictures ? (Array.isArray(req.files.pictures) ? req.files.pictures : [req.files.pictures]) : [];
+
+  for (const file of files) {
+    if (!allowedTypes.includes(file.mimetype)) {
+      return res.status(400).json({
+        message: 'Invalid file type. Only JPG, JPEG and PNG files are allowed.'
+      });
+    }
+  }
+  next();
+});
 
 // XSS Protection
 app.use(xss());

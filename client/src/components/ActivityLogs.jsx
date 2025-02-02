@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { format, isValid } from 'date-fns';
 import { FiActivity, FiClock, FiGlobe, FiMonitor, FiCheck, FiX } from 'react-icons/fi';
+import DOMPurify from 'dompurify';
 
 const ActivityLogs = () => {
     const [logs, setLogs] = useState([]);
@@ -121,6 +122,13 @@ const ActivityLogs = () => {
         }
     };
 
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
+    };
+
     return (
         <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             <div className="space-y-4">
@@ -145,11 +153,14 @@ const ActivityLogs = () => {
                                     {typeof log.details === 'object' 
                                         ? Object.entries(log.details).map(([key, value]) => (
                                             <div key={key} className="text-xs">
-                                                <span className="font-medium">{key}:</span> {' '}
-                                                {typeof value === 'object' ? JSON.stringify(value) : value}
+                                                <span className="font-medium">{sanitizeContent(key)}:</span> {' '}
+                                                {typeof value === 'object' 
+                                                    ? sanitizeContent(JSON.stringify(value))
+                                                    : sanitizeContent(value)
+                                                }
                                             </div>
                                         ))
-                                        : log.details
+                                        : sanitizeContent(log.details)
                                     }
                                 </div>
                             )}

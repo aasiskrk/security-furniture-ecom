@@ -3,6 +3,7 @@ import AdminLayout from '../../components/AdminLayout';
 import { FiEye, FiEdit2, FiSearch, FiDollarSign, FiPhone, FiMapPin } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 import { getAllOrdersApi, updateOrderStatusApi, updatePaymentStatusApi } from '../../api/apis';
+import DOMPurify from 'dompurify';
 
 const AdminOrders = () => {
     const [activeTab, setActiveTab] = useState('active');
@@ -174,6 +175,14 @@ const AdminOrders = () => {
         }
     };
 
+    // Add sanitization for order details, customer info, etc.
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
+    };
+
     const OrderDetailsModal = ({ order, onClose }) => (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -210,7 +219,7 @@ const AdminOrders = () => {
                                     {order.orderItems.map((item, index) => (
                                         <div key={index} className="flex gap-4 p-4 rounded-lg bg-[#F8F5F1]/50">
                                             <img
-                                                src={`http://localhost:5000${item.product?.pictures[0]}`}
+                                                src={`https://localhost:5000${item.product?.pictures[0]}`}
                                                 alt={item.name}
                                                 className="w-24 h-24 object-cover rounded-lg border border-[#C4A484]/10"
                                             />
@@ -240,8 +249,8 @@ const AdminOrders = () => {
                             <div className="bg-white rounded-xl border border-[#C4A484]/10 p-6">
                                 <h3 className="text-lg font-medium text-gray-900 mb-4">Customer</h3>
                                 <div className="space-y-2">
-                                    <p className="text-base font-medium text-gray-900">{order.user?.name || 'Deleted User'}</p>
-                                    <p className="text-sm text-gray-600">{order.user?.email || 'N/A'}</p>
+                                    <p className="text-base font-medium text-gray-900">{sanitizeContent(order.user?.name || 'Deleted User')}</p>
+                                    <p className="text-sm text-gray-600">{sanitizeContent(order.user?.email || 'N/A')}</p>
                                 </div>
                             </div>
 
@@ -252,16 +261,16 @@ const AdminOrders = () => {
                                     <div>
                                         <p className="text-sm text-gray-600 mb-1">Status</p>
                                         <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(order.status)}`}>
-                                            {order.status}
+                                            {sanitizeContent(order.status)}
                                         </span>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600 mb-1">Payment</p>
                                         <div className="flex flex-col gap-1">
                                             <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getPaymentStatusColor(order.isPaid)}`}>
-                                                {order.isPaid ? 'Paid' : 'Pending'}
+                                                {sanitizeContent(order.isPaid ? 'Paid' : 'Pending')}
                                             </span>
-                                            <span className="text-sm text-gray-600">Method: {order.paymentMethod}</span>
+                                            <span className="text-sm text-gray-600">Method: {sanitizeContent(order.paymentMethod)}</span>
                                             {order.isPaid && (
                                                 <span className="text-sm text-gray-600">
                                                     Paid on {new Date(order.paidAt).toLocaleDateString()}
@@ -276,16 +285,16 @@ const AdminOrders = () => {
                             <div className="bg-white rounded-xl border border-[#C4A484]/10 p-6">
                                 <h3 className="text-lg font-medium text-gray-900 mb-4">Shipping Address</h3>
                                 <div className="space-y-2 text-sm text-gray-600">
-                                    <p className="font-medium text-gray-900">{order.shippingAddress.fullName}</p>
+                                    <p className="font-medium text-gray-900">{sanitizeContent(order.shippingAddress.fullName)}</p>
                                     <p className="flex items-center gap-2">
                                         <FiPhone className="w-4 h-4" />
-                                        {order.shippingAddress.phone}
+                                        {sanitizeContent(order.shippingAddress.phone)}
                                     </p>
                                     <p className="flex items-center gap-2">
                                         <FiMapPin className="w-4 h-4" />
-                                        {order.shippingAddress.address}
+                                        {sanitizeContent(order.shippingAddress.address)}
                                     </p>
-                                    <p className="ml-6">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pinCode}</p>
+                                    <p className="ml-6">{sanitizeContent(order.shippingAddress.city)}, {sanitizeContent(order.shippingAddress.state)} {sanitizeContent(order.shippingAddress.pinCode)}</p>
                                 </div>
                             </div>
                         </div>
@@ -335,7 +344,7 @@ const AdminOrders = () => {
                             <option value="Delivered">Delivered</option>
                             <option value="Cancelled">Cancelled</option>
                         </select>
-                        <p className="mt-2 text-sm text-gray-500">Current status: <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>{order.status}</span></p>
+                        <p className="mt-2 text-sm text-gray-500">Current status: <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>{sanitizeContent(order.status)}</span></p>
                     </div>
 
                     {/* Payment Status */}
@@ -344,9 +353,9 @@ const AdminOrders = () => {
                         <div className="flex items-center justify-between p-4 rounded-lg bg-[#F8F5F1]/50">
                             <div>
                                 <p className="text-sm font-medium text-gray-900">Current Status: <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.isPaid)}`}>
-                                    {order.isPaid ? 'Paid' : 'Pending'}
+                                    {sanitizeContent(order.isPaid ? 'Paid' : 'Pending')}
                                 </span></p>
-                                <p className="text-sm text-gray-500 mt-1">Method: {order.paymentMethod}</p>
+                                <p className="text-sm text-gray-500 mt-1">Method: {sanitizeContent(order.paymentMethod)}</p>
                             </div>
                             <button
                                 onClick={() => handleUpdatePayment(order._id)}
@@ -476,14 +485,14 @@ const AdminOrders = () => {
                                                 #{formatOrderId(order._id)}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="text-sm text-amber-900">{order.user?.name || 'Deleted User'}</div>
-                                                <div className="text-xs text-amber-700">{order.user?.email || 'N/A'}</div>
+                                                <div className="text-sm text-amber-900">{sanitizeContent(order.user?.name || 'Deleted User')}</div>
+                                                <div className="text-xs text-amber-700">{sanitizeContent(order.user?.email || 'N/A')}</div>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-amber-900">
                                                 Nrp {order.totalPrice.toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-sm text-amber-900">
-                                                {order.paymentMethod}
+                                                {sanitizeContent(order.paymentMethod)}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center space-x-3">
@@ -549,8 +558,8 @@ const AdminOrders = () => {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center">
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{order.user?.name || 'Deleted User'}</div>
-                                                <div className="text-sm text-gray-500">{order.user?.email || 'N/A'}</div>
+                                                <div className="text-sm font-medium text-gray-900">{sanitizeContent(order.user?.name || 'Deleted User')}</div>
+                                                <div className="text-sm text-gray-500">{sanitizeContent(order.user?.email || 'N/A')}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -562,12 +571,12 @@ const AdminOrders = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getPaymentStatusColor(order.isPaid)}`}>
-                                            {order.isPaid ? 'Paid' : 'Pending'} ({order.paymentMethod})
+                                            {sanitizeContent(order.isPaid ? 'Paid' : 'Pending')} ({sanitizeContent(order.paymentMethod)})
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                                            {order.status}
+                                            {sanitizeContent(order.status)}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">

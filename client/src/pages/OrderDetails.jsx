@@ -4,8 +4,17 @@ import { FiArrowLeft, FiPackage, FiClock, FiMapPin, FiPhone, FiCheck, FiX, FiCal
 import { toast } from 'react-hot-toast';
 import { getOrderByIdApi, cancelOrderApi } from '../api/apis';
 import Cookies from 'js-cookie';
+import DOMPurify from 'dompurify';
 
 const CART_COOKIE_KEY = 'furniture_cart';
+
+// Add sanitization function
+const sanitizeContent = (content) => {
+    if (typeof content === 'string') {
+        return DOMPurify.sanitize(content);
+    }
+    return content;
+};
 
 const OrderDetails = () => {
     const { orderId } = useParams();
@@ -162,7 +171,7 @@ const OrderDetails = () => {
                         <div className="flex flex-wrap items-center gap-3">
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getStatusColor(order.status)}`}>
                                 <FiPackage className="w-4 h-4" />
-                                {order.status}
+                                {sanitizeContent(order.status)}
                             </span>
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ring-1 ring-inset ${getPaymentStatusColor(order.isPaid)}`}>
                                 {order.isPaid ? (
@@ -202,7 +211,7 @@ const OrderDetails = () => {
                                     <div key={index} className="flex gap-6">
                                         <img
                                             src={`https://localhost:5000${item.product?.pictures[0]}`}
-                                            alt={item.name}
+                                            alt={sanitizeContent(item.name)}
                                             className="w-24 h-24 object-cover rounded-xl border border-[#C4A484]/10"
                                             onError={(e) => {
                                                 e.target.onerror = null;
@@ -210,7 +219,7 @@ const OrderDetails = () => {
                                             }}
                                         />
                                         <div className="flex-1">
-                                            <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
+                                            <h3 className="text-lg font-medium text-gray-900">{sanitizeContent(item.name)}</h3>
                                             <div className="mt-1 space-y-1 text-sm text-[#8B5E34]">
                                                 <p>Color: {item.color}</p>
                                                 <p>Quantity: {item.quantity}</p>
@@ -233,14 +242,14 @@ const OrderDetails = () => {
                                 <div className="flex items-start gap-3">
                                     <FiMapPin className="w-5 h-5 text-[#8B5E34] mt-0.5" />
                                     <div>
-                                        <p className="font-medium text-gray-900">{order.shippingAddress.fullName}</p>
-                                        <p className="text-[#8B5E34]">{order.shippingAddress.address}</p>
+                                        <p className="font-medium text-gray-900">{sanitizeContent(order.shippingAddress.fullName)}</p>
+                                        <p className="text-[#8B5E34]">{sanitizeContent(order.shippingAddress.address)}</p>
                                         <p className="text-[#8B5E34]">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pinCode}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <FiPhone className="w-5 h-5 text-[#8B5E34]" />
-                                    <p className="text-[#8B5E34]">{order.shippingAddress.phone}</p>
+                                    <p className="text-[#8B5E34]">{sanitizeContent(order.shippingAddress.phone)}</p>
                                 </div>
                             </div>
                         </div>
@@ -273,7 +282,7 @@ const OrderDetails = () => {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3 text-[#8B5E34]">
                                     <FiCreditCard className="w-5 h-5" />
-                                    <span>{order.paymentMethod}</span>
+                                    <span>{sanitizeContent(order.paymentMethod)}</span>
                                 </div>
                                 <div className="flex items-center gap-3 text-[#8B5E34]">
                                     <FiCheck className="w-5 h-5" />

@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { createProductApi, getAllProductsApi, updateProductApi, deleteProductApi } from '../../api/apis.js';
 import { sanitizeFormData, sanitizePrice } from '../../utils/sanitize';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 
 const ProductModal = ({ isOpen, onClose, product, mode }) => {
     const [formData, setFormData] = useState({
@@ -619,6 +620,14 @@ const getStockStatus = (countInStock) => {
     return { label: 'In Stock', className: 'bg-green-100 text-green-800' };
 };
 
+// Add sanitization for product details
+const sanitizeContent = (content) => {
+    if (typeof content === 'string') {
+        return DOMPurify.sanitize(content);
+    }
+    return content;
+};
+
 const Products = () => {
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
@@ -817,21 +826,21 @@ const Products = () => {
                                                     />
                                                 </div>
                                                 <div className="ml-4">
-                                                    <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                                    <div className="text-sm text-gray-500 line-clamp-1">{product.description}</div>
+                                                    <div className="text-sm font-medium text-gray-900">{sanitizeContent(product.name)}</div>
+                                                    <div className="text-sm text-gray-500 line-clamp-1">{sanitizeContent(product.description)}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900">{product.category}</div>
-                                            <div className="text-sm text-gray-500">{product.subCategory}</div>
+                                            <div className="text-sm text-gray-900">{sanitizeContent(product.category)}</div>
+                                            <div className="text-sm text-gray-500">{sanitizeContent(product.subCategory)}</div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-900">
-                                            Nrp {product.price.toLocaleString()}
+                                            Nrp {sanitizeContent(product.price.toLocaleString())}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex text-sm ${product.countInStock > 0 ? (product.countInStock <= 10 ? 'text-yellow-600' : 'text-green-600') : 'text-red-600'}`}>
-                                                {product.countInStock} units
+                                                {sanitizeContent(product.countInStock.toString())} units
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -841,14 +850,14 @@ const Products = () => {
                                                         key={index}
                                                         className="w-6 h-6 rounded-full border-2 border-white ring-2 ring-[#C4A484]/10"
                                                         style={{ backgroundColor: color.code }}
-                                                        title={color.name}
+                                                        title={sanitizeContent(color.name)}
                                                     />
                                                 ))}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStockStatus(product.countInStock).className}`}>
-                                                {getStockStatus(product.countInStock).label}
+                                                {sanitizeContent(getStockStatus(product.countInStock).label)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -924,7 +933,7 @@ const Products = () => {
                     setSelectedProduct(null);
                 }}
                 onConfirm={handleDelete}
-                productName={selectedProduct?.name}
+                productName={sanitizeContent(selectedProduct?.name)}
             />
         </AdminLayout>
     );

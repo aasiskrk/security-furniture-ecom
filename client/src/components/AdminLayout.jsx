@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { FiBox, FiUsers, FiShoppingBag, FiGrid } from 'react-icons/fi';
+import DOMPurify from 'dompurify';
 
 const AdminLayout = ({ children }) => {
     const location = useLocation();
@@ -21,6 +22,14 @@ const AdminLayout = ({ children }) => {
             icon: <FiShoppingBag className="w-5 h-5" />
         },
             ];
+
+    // Add sanitization for any user-generated content being rendered
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
+    };
 
     return (
         <div className="flex h-[calc(100vh-3.5rem)]">

@@ -4,6 +4,7 @@ import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { getProductByIdApi, getAllProductsApi } from '../api/apis.js';
 import { toast } from 'react-hot-toast';
 import Cookies from 'js-cookie';
+import DOMPurify from 'dompurify';
 
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 const CART_COOKIE_KEY = 'furniture_cart';
@@ -12,6 +13,14 @@ const getStockStatus = (countInStock) => {
     if (countInStock === 0) return { label: 'Out of Stock', className: 'text-red-500' };
     if (countInStock <= 10) return { label: `Only ${countInStock} left in stock`, className: 'text-yellow-500' };
     return { label: 'In Stock', className: 'text-green-500' };
+};
+
+// Add sanitization function
+const sanitizeContent = (content) => {
+    if (typeof content === 'string') {
+        return DOMPurify.sanitize(content);
+    }
+    return content;
 };
 
 const ProductDetails = () => {
@@ -240,7 +249,7 @@ const ProductDetails = () => {
                             to={`/shop?category=${product.category}`}
                             className="text-gray-500 hover:text-[#C4A484] transition-colors"
                         >
-                            {product.category}
+                            {sanitizeContent(product.category)}
                         </Link>
                         {product.subCategory && (
                             <>
@@ -249,7 +258,7 @@ const ProductDetails = () => {
                                     to={`/shop?category=${product.category}&subcategory=${product.subCategory}`}
                                     className="text-gray-500 hover:text-[#C4A484] transition-colors"
                                 >
-                                    {product.subCategory}
+                                    {sanitizeContent(product.subCategory)}
                                 </Link>
                             </>
                         )}
@@ -261,14 +270,14 @@ const ProductDetails = () => {
                             to={`/shop?category=${product.category}`}
                             className="px-3 py-1 bg-[#C4A484]/10 text-[#C4A484] rounded-full text-sm font-medium hover:bg-[#C4A484]/20 transition-colors"
                         >
-                            {product.category}
+                            {sanitizeContent(product.category)}
                         </Link>
                         {product.subCategory && (
                             <Link
                                 to={`/shop?category=${product.category}&subcategory=${product.subCategory}`}
                                 className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
                             >
-                                {product.subCategory}
+                                {sanitizeContent(product.subCategory)}
                             </Link>
                         )}
                     </div>
@@ -278,14 +287,14 @@ const ProductDetails = () => {
                         <div className="mb-6">
                             <h3 className="text-sm font-medium text-gray-900 mb-2">Availability</h3>
                             <p className={`text-sm ${getStockStatus(product.countInStock).className}`}>
-                                {getStockStatus(product.countInStock).label}
+                                {sanitizeContent(getStockStatus(product.countInStock).label)}
                             </p>
                         </div>
                     </div>
 
                     {/* Product Title and Description */}
-                    <h1 className="text-3xl font-serif font-bold text-gray-900 mb-4">{product.name}</h1>
-                    <p className="text-gray-600 mb-8">{product.description}</p>
+                    <h1 className="text-3xl font-serif font-bold text-gray-900 mb-4">{sanitizeContent(product.name)}</h1>
+                    <p className="text-gray-600 mb-8">{sanitizeContent(product.description)}</p>
 
                     {/* Price */}
                     <div className="flex items-center gap-4 mb-8">
@@ -307,7 +316,7 @@ const ProductDetails = () => {
                             <div>
                                 <h4 className="text-sm font-medium text-gray-900 mb-2">Material & Weight</h4>
                                 <div className="space-y-2 text-sm text-gray-600">
-                                    <p>Material: {product.material}</p>
+                                    <p>Material: {sanitizeContent(product.material)}</p>
                                     <p>Weight: {product.weight.value} {product.weight.unit}</p>
                                 </div>
                             </div>
@@ -323,7 +332,7 @@ const ProductDetails = () => {
                                     <svg className="w-5 h-5 text-[#C4A484]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {feature}
+                                    {sanitizeContent(feature)}
                                 </li>
                             ))}
                         </ul>
@@ -345,7 +354,7 @@ const ProductDetails = () => {
                                         style={{ backgroundColor: color.code }}
                                     />
                                     <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {color.name}
+                                        {sanitizeContent(color.name)}
                                     </span>
                                 </button>
                             ))}
@@ -410,10 +419,10 @@ const ProductDetails = () => {
                                     </div>
                                     <div className="p-4">
                                         <h3 className="text-lg font-medium text-gray-900 mb-2 group-hover:text-[#C4A484] transition-colors">
-                                            {product.name}
+                                            {sanitizeContent(product.name)}
                                         </h3>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-600">{product.category}</span>
+                                            <span className="text-sm text-gray-600">{sanitizeContent(product.category)}</span>
                                             <span className="font-medium text-[#8B5E34]">
                                                 Nrp {product.price.toLocaleString()}
                                             </span>

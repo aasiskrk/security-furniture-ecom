@@ -6,6 +6,7 @@ import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { getAllProductsApi, getProductCategoriesApi } from '../api/apis.js';
 import { toast } from 'react-hot-toast';
 import Cookies from 'js-cookie';
+import DOMPurify from 'dompurify';
 
 // Image cache for faster loading
 const imageCache = new Map();
@@ -33,6 +34,14 @@ const getStockStatus = (countInStock) => {
     if (countInStock === 0) return { label: 'Out of Stock', className: 'bg-red-100 text-red-800' };
     if (countInStock <= 10) return { label: `Only ${countInStock} left`, className: 'bg-yellow-100 text-yellow-800' };
     return { label: 'In Stock', className: 'bg-green-100 text-green-800' };
+};
+
+// Add sanitization function
+const sanitizeContent = (content) => {
+    if (typeof content === 'string') {
+        return DOMPurify.sanitize(content);
+    }
+    return content;
 };
 
 const ProductCard = ({ product, view }) => {
@@ -261,9 +270,9 @@ const ProductCard = ({ product, view }) => {
                     <div className="flex-1 p-6">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-[#C4A484]">{product.category}</span>
+                                <span className="text-sm font-medium text-[#C4A484]">{sanitizeContent(product.category)}</span>
                                 {product.subCategory && (
-                                    <span className="text-xs text-gray-500">{product.subCategory}</span>
+                                    <span className="text-xs text-gray-500">{sanitizeContent(product.subCategory)}</span>
                                 )}
                             </div>
                             <div className="flex -space-x-1.5">
@@ -278,13 +287,13 @@ const ProductCard = ({ product, view }) => {
                             </div>
                         </div>
                         <h3 className="text-xl font-serif font-bold text-gray-900 mb-3 group-hover:text-[#C4A484] transition-colors">
-                            {product.name}
+                            {sanitizeContent(product.name)}
                         </h3>
-                        <p className="text-gray-600 mb-4 line-clamp-2">{product.description}</p>
+                        <p className="text-gray-600 mb-4 line-clamp-2">{sanitizeContent(product.description)}</p>
                         <div className="flex flex-wrap gap-4 mb-4">
                             <div className="flex items-center gap-2">
                                 <span className="text-gray-500">Material:</span>
-                                <span className="font-medium text-gray-900">{product.material}</span>
+                                <span className="font-medium text-gray-900">{sanitizeContent(product.material)}</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-gray-500">Stock:</span>
@@ -376,9 +385,9 @@ const ProductCard = ({ product, view }) => {
                     <div className="p-5 flex flex-col flex-grow">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-[#C4A484]">{product.category}</span>
+                                <span className="text-sm font-medium text-[#C4A484]">{sanitizeContent(product.category)}</span>
                                 {product.subCategory && (
-                                    <span className="text-xs text-gray-500">{product.subCategory}</span>
+                                    <span className="text-xs text-gray-500">{sanitizeContent(product.subCategory)}</span>
                                 )}
                             </div>
                             <div className="flex -space-x-1.5">
@@ -393,10 +402,10 @@ const ProductCard = ({ product, view }) => {
                             </div>
                         </div>
                         <h3 className="text-lg font-serif font-bold text-gray-900 mb-2 line-clamp-1 group-hover:text-[#C4A484] transition-colors">
-                            {product.name}
+                            {sanitizeContent(product.name)}
                         </h3>
                         <div className="flex items-center justify-between mt-auto">
-                            <p className="text-gray-600 text-sm line-clamp-1">{product.material}</p>
+                            <p className="text-gray-600 text-sm line-clamp-1">{sanitizeContent(product.material)}</p>
                             <p className="font-medium text-gray-900 whitespace-nowrap">
                                 Nrp {product.price.toLocaleString()}
                             </p>

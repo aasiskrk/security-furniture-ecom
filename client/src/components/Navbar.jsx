@@ -8,6 +8,7 @@ import { getAllProductsApi } from '../api/apis';
 import { sanitizeSearchQuery } from '../utils/sanitize';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import DOMPurify from 'dompurify';
 
 const WISHLIST_COOKIE_KEY = 'furniture_wishlist';
 const CART_COOKIE_KEY = 'furniture_cart';
@@ -309,6 +310,14 @@ const Navbar = () => {
         window.location.href = `/shop?${searchParams.toString()}`;
     };
 
+    // Add sanitization for any user-specific content (like username)
+    const sanitizeContent = (content) => {
+        if (typeof content === 'string') {
+            return DOMPurify.sanitize(content);
+        }
+        return content;
+    };
+
     return (
         <div>
             <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
@@ -427,7 +436,7 @@ const Navbar = () => {
                                 <div className="relative group">
                                     <button className="flex items-center space-x-2 text-[#333333] hover:text-[#C4A484] transition-colors">
                                         <FiUser className="w-6 h-6" />
-                                        <span className="text-sm font-medium">{user.name}</span>
+                                        <span className="text-sm font-medium">{sanitizeContent(user.name)}</span>
                                     </button>
                                     <div className="absolute right-0 w-48 mt-2 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                                         <div className="py-1">
